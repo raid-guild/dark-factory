@@ -1,0 +1,995 @@
+openapi: 3.1.0
+info:
+  title: Dark Factory API
+  version: 0.1.0
+  description: API-first coordination runtime for humans and agents.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local
+tags:
+  - name: Agents
+  - name: Tasks
+  - name: Workflow Runs
+  - name: Approvals
+  - name: Artifacts
+  - name: Handoffs
+paths:
+  /agents/register:
+    post:
+      tags: [Agents]
+      summary: Register an agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRegisterRequest'
+      responses:
+        '201':
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+  /agents/{agentId}:
+    patch:
+      tags: [Agents]
+      summary: Update agent metadata
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdateRequest'
+      responses:
+        '200':
+          description: Agent updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+  /agents/{agentId}/heartbeat:
+    post:
+      tags: [Agents]
+      summary: Submit agent presence heartbeat
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentHeartbeatRequest'
+      responses:
+        '200':
+          description: Presence upserted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentPresence'
+  /agents/{agentId}/presence:
+    get:
+      tags: [Agents]
+      summary: Get current agent presence
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      responses:
+        '200':
+          description: Presence snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentPresence'
+  /agents/{agentId}/events:
+    post:
+      tags: [Agents]
+      summary: Emit an event
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreateRequest'
+      responses:
+        '201':
+          description: Event recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+  /agents/{agentId}/tasks:
+    get:
+      tags: [Agents]
+      summary: List tasks assigned to agent
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - in: query
+          name: status
+          schema:
+            type: string
+          description: Comma-separated statuses
+      responses:
+        '200':
+          description: Task list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+  /tasks:
+    post:
+      tags: [Tasks]
+      summary: Create task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreateRequest'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: owner_agent_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: workflow_run_id
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Task list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+  /tasks/{taskId}:
+    get:
+      tags: [Tasks]
+      summary: Get task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+    patch:
+      tags: [Tasks]
+      summary: Update task metadata
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdateRequest'
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks/{taskId}/claim:
+    post:
+      tags: [Tasks]
+      summary: Claim a queued task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskActorRequest'
+      responses:
+        '200':
+          description: Task claimed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks/{taskId}/start:
+    post:
+      tags: [Tasks]
+      summary: Start task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskActorRequest'
+      responses:
+        '200':
+          description: Task started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks/{taskId}/block:
+    post:
+      tags: [Tasks]
+      summary: Block task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskBlockRequest'
+      responses:
+        '200':
+          description: Task blocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks/{taskId}/complete:
+    post:
+      tags: [Tasks]
+      summary: Complete task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskActorRequest'
+      responses:
+        '200':
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks/{taskId}/fail:
+    post:
+      tags: [Tasks]
+      summary: Fail task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskFailureRequest'
+      responses:
+        '200':
+          description: Task failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks/{taskId}/cancel:
+    post:
+      tags: [Tasks]
+      summary: Cancel task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskFailureRequest'
+      responses:
+        '200':
+          description: Task canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks/{taskId}/comments:
+    post:
+      tags: [Tasks]
+      summary: Add comment/note to task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCommentRequest'
+      responses:
+        '201':
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEvent'
+  /tasks/{taskId}/artifacts:
+    get:
+      tags: [Artifacts]
+      summary: List task artifacts
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Artifact list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactListResponse'
+  /tasks/{taskId}/handoffs:
+    get:
+      tags: [Handoffs]
+      summary: List task handoffs
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Handoff list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HandoffListResponse'
+  /workflow-runs:
+    post:
+      tags: [Workflow Runs]
+      summary: Create workflow run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowRunCreateRequest'
+      responses:
+        '201':
+          description: Workflow run created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+    get:
+      tags: [Workflow Runs]
+      summary: List workflow runs
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: workflow_template_id
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Workflow run list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRunListResponse'
+  /workflow-runs/{runId}:
+    get:
+      tags: [Workflow Runs]
+      summary: Get workflow run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Workflow run detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+  /workflow-runs/{runId}/advance:
+    post:
+      tags: [Workflow Runs]
+      summary: Advance workflow run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunAdvanceRequest'
+      responses:
+        '200':
+          description: Workflow run advanced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+  /workflow-runs/{runId}/block:
+    post:
+      tags: [Workflow Runs]
+      summary: Block workflow run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunBlockRequest'
+      responses:
+        '200':
+          description: Workflow run blocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+  /workflow-runs/{runId}/cancel:
+    post:
+      tags: [Workflow Runs]
+      summary: Cancel workflow run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunAdvanceRequest'
+      responses:
+        '200':
+          description: Workflow run canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+  /workflow-runs/{runId}/artifacts:
+    get:
+      tags: [Artifacts]
+      summary: List workflow run artifacts
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Artifact list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactListResponse'
+  /approvals:
+    post:
+      tags: [Approvals]
+      summary: Request approval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalCreateRequest'
+      responses:
+        '201':
+          description: Approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+  /approvals/pending:
+    get:
+      tags: [Approvals]
+      summary: List pending approvals
+      parameters:
+        - in: query
+          name: requested_from_actor_id
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pending approvals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalListResponse'
+  /approvals/{approvalId}:
+    get:
+      tags: [Approvals]
+      summary: Get approval
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      responses:
+        '200':
+          description: Approval detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+  /approvals/{approvalId}/approve:
+    post:
+      tags: [Approvals]
+      summary: Approve item
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRequest'
+      responses:
+        '200':
+          description: Approval resolved as approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+  /approvals/{approvalId}/reject:
+    post:
+      tags: [Approvals]
+      summary: Reject item
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRequest'
+      responses:
+        '200':
+          description: Approval resolved as rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+  /approvals/{approvalId}/revise:
+    post:
+      tags: [Approvals]
+      summary: Request revisions
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRequest'
+      responses:
+        '200':
+          description: Approval resolved as revision requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+  /artifacts:
+    post:
+      tags: [Artifacts]
+      summary: Attach artifact reference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArtifactCreateRequest'
+      responses:
+        '201':
+          description: Artifact created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+  /artifacts/{artifactId}:
+    get:
+      tags: [Artifacts]
+      summary: Get artifact
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        '200':
+          description: Artifact detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+  /artifacts/{artifactId}/mark-approved:
+    post:
+      tags: [Artifacts]
+      summary: Mark artifact approval status
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArtifactMarkApprovedRequest'
+      responses:
+        '200':
+          description: Artifact updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+  /handoffs:
+    post:
+      tags: [Handoffs]
+      summary: Create handoff
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HandoffCreateRequest'
+      responses:
+        '201':
+          description: Handoff created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+  /handoffs/{handoffId}:
+    get:
+      tags: [Handoffs]
+      summary: Get handoff
+      parameters:
+        - $ref: '#/components/parameters/HandoffId'
+      responses:
+        '200':
+          description: Handoff detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Handoff'
+components:
+  parameters:
+    AgentId:
+      in: path
+      name: agentId
+      required: true
+      schema: { type: string, format: uuid }
+    TaskId:
+      in: path
+      name: taskId
+      required: true
+      schema: { type: string, format: uuid }
+    RunId:
+      in: path
+      name: runId
+      required: true
+      schema: { type: string, format: uuid }
+    ApprovalId:
+      in: path
+      name: approvalId
+      required: true
+      schema: { type: string, format: uuid }
+    ArtifactId:
+      in: path
+      name: artifactId
+      required: true
+      schema: { type: string, format: uuid }
+    HandoffId:
+      in: path
+      name: handoffId
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    Agent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        agent_key: { type: string }
+        name: { type: string }
+        description: { type: string }
+        type: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+        status:
+          type: string
+          enum: [active, inactive]
+      required: [id, agent_key, name, type, status]
+    AgentPresence:
+      type: object
+      properties:
+        agent_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [idle, available, working, blocked, offline]
+        station: { type: string }
+        current_task_id: { type: string, format: uuid }
+        current_workflow_run_id: { type: string, format: uuid }
+        progress_pct: { type: integer, minimum: 0, maximum: 100 }
+        status_message: { type: string }
+        last_heartbeat_at: { type: string, format: date-time }
+      required: [agent_id, status, last_heartbeat_at]
+    Task:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        task_type: { type: string }
+        status:
+          type: string
+          enum: [queued, claimed, in_progress, blocked, waiting_approval, completed, failed, canceled]
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        owner_agent_id: { type: string, format: uuid }
+        requested_by_actor_id: { type: string, format: uuid }
+        workflow_run_id: { type: string, format: uuid }
+        blocked_reason: { type: string }
+        due_at: { type: string, format: date-time }
+      required: [id, title, task_type, status, priority]
+    TaskEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        task_id: { type: string, format: uuid }
+        actor_id: { type: string, format: uuid }
+        event_type: { type: string }
+        payload: { type: object, additionalProperties: true }
+        created_at: { type: string, format: date-time }
+      required: [id, task_id, event_type, created_at]
+    Event:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        actor_id: { type: string, format: uuid }
+        agent_id: { type: string, format: uuid }
+        task_id: { type: string, format: uuid }
+        workflow_run_id: { type: string, format: uuid }
+        event_type: { type: string }
+        payload: { type: object, additionalProperties: true }
+        created_at: { type: string, format: date-time }
+      required: [id, event_type, created_at]
+    WorkflowRun:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        workflow_template_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [pending, running, blocked, completed, failed, canceled]
+        requested_by_actor_id: { type: string, format: uuid }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        context_json: { type: object, additionalProperties: true }
+      required: [id, workflow_template_id, status]
+    Approval:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        task_id: { type: string, format: uuid }
+        artifact_id: { type: string, format: uuid }
+        requested_from_actor_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [pending, approved, rejected, revision_requested]
+        note: { type: string }
+        decided_by_actor_id: { type: string, format: uuid }
+        decided_at: { type: string, format: date-time }
+      required: [id, status]
+    Artifact:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        task_id: { type: string, format: uuid }
+        workflow_run_id: { type: string, format: uuid }
+        kind: { type: string }
+        title: { type: string }
+        uri: { type: string }
+        metadata_json: { type: object, additionalProperties: true }
+        created_by_actor_id: { type: string, format: uuid }
+        approved_status:
+          type: string
+          enum: [unreviewed, approved, rejected]
+      required: [id, kind, title, uri, approved_status]
+    Handoff:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        from_task_id: { type: string, format: uuid }
+        to_task_id: { type: string, format: uuid }
+        from_actor_id: { type: string, format: uuid }
+        to_actor_id: { type: string, format: uuid }
+        note: { type: string }
+        status:
+          type: string
+          enum: [created, accepted, declined, completed]
+      required: [id, status]
+    AgentRegisterRequest:
+      type: object
+      properties:
+        agent_key: { type: string }
+        name: { type: string }
+        description: { type: string }
+        type: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+      required: [agent_key, name]
+    AgentUpdateRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        status: { type: string, enum: [active, inactive] }
+        capabilities:
+          type: array
+          items: { type: string }
+    AgentHeartbeatRequest:
+      type: object
+      properties:
+        status: { type: string, enum: [idle, available, working, blocked, offline] }
+        station: { type: string }
+        current_task_id: { type: string, format: uuid }
+        current_workflow_run_id: { type: string, format: uuid }
+        progress_pct: { type: integer, minimum: 0, maximum: 100 }
+        status_message: { type: string }
+      required: [status]
+    EventCreateRequest:
+      type: object
+      properties:
+        actor_id: { type: string, format: uuid }
+        task_id: { type: string, format: uuid }
+        workflow_run_id: { type: string, format: uuid }
+        event_type: { type: string }
+        payload: { type: object, additionalProperties: true }
+      required: [event_type]
+    TaskCreateRequest:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        task_type: { type: string }
+        priority: { type: string, enum: [low, normal, high, urgent] }
+        owner_agent_id: { type: string, format: uuid }
+        requested_by_actor_id: { type: string, format: uuid }
+        workflow_run_id: { type: string, format: uuid }
+        due_at: { type: string, format: date-time }
+      required: [title, task_type]
+    TaskUpdateRequest:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        priority: { type: string, enum: [low, normal, high, urgent] }
+        owner_agent_id: { type: string, format: uuid }
+        due_at: { type: string, format: date-time }
+    TaskActorRequest:
+      type: object
+      properties:
+        actor_id: { type: string, format: uuid }
+        note: { type: string }
+    TaskBlockRequest:
+      type: object
+      properties:
+        actor_id: { type: string, format: uuid }
+        reason_code: { type: string }
+        blocked_reason: { type: string }
+      required: [blocked_reason]
+    TaskFailureRequest:
+      type: object
+      properties:
+        actor_id: { type: string, format: uuid }
+        reason: { type: string }
+    TaskCommentRequest:
+      type: object
+      properties:
+        actor_id: { type: string, format: uuid }
+        comment: { type: string }
+      required: [comment]
+    WorkflowRunCreateRequest:
+      type: object
+      properties:
+        workflow_template_id: { type: string, format: uuid }
+        requested_by_actor_id: { type: string, format: uuid }
+        context_json: { type: object, additionalProperties: true }
+      required: [workflow_template_id]
+    RunAdvanceRequest:
+      type: object
+      properties:
+        actor_id: { type: string, format: uuid }
+        note: { type: string }
+    RunBlockRequest:
+      type: object
+      properties:
+        actor_id: { type: string, format: uuid }
+        reason: { type: string }
+      required: [reason]
+    ApprovalCreateRequest:
+      type: object
+      properties:
+        task_id: { type: string, format: uuid }
+        artifact_id: { type: string, format: uuid }
+        requested_from_actor_id: { type: string, format: uuid }
+        note: { type: string }
+      required: [requested_from_actor_id]
+    DecisionRequest:
+      type: object
+      properties:
+        actor_id: { type: string, format: uuid }
+        note: { type: string }
+    ArtifactCreateRequest:
+      type: object
+      properties:
+        task_id: { type: string, format: uuid }
+        workflow_run_id: { type: string, format: uuid }
+        kind: { type: string }
+        title: { type: string }
+        uri: { type: string }
+        metadata_json: { type: object, additionalProperties: true }
+        created_by_actor_id: { type: string, format: uuid }
+      required: [kind, title, uri]
+    ArtifactMarkApprovedRequest:
+      type: object
+      properties:
+        approved_status:
+          type: string
+          enum: [unreviewed, approved, rejected]
+        actor_id: { type: string, format: uuid }
+      required: [approved_status]
+    HandoffCreateRequest:
+      type: object
+      properties:
+        from_task_id: { type: string, format: uuid }
+        to_task_id: { type: string, format: uuid }
+        from_actor_id: { type: string, format: uuid }
+        to_actor_id: { type: string, format: uuid }
+        note: { type: string }
+      required: [to_actor_id]
+    TaskListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+      required: [items]
+    WorkflowRunListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowRun'
+      required: [items]
+    ApprovalListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approval'
+      required: [items]
+    ArtifactListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Artifact'
+      required: [items]
+    HandoffListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Handoff'
+      required: [items]
