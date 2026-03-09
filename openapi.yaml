@@ -17,7 +17,7 @@ paths:
   /agents/register:
     post:
       tags: [Agents]
-      summary: Register an agent
+      summary: Admin-create or provision an agent registry entry
       requestBody:
         required: true
         content:
@@ -27,6 +27,23 @@ paths:
       responses:
         '201':
           description: Agent created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+  /agents/register-self:
+    post:
+      tags: [Agents]
+      summary: Self-register or upsert the agent identity bound to the caller key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentSelfRegisterRequest'
+      responses:
+        '200':
+          description: Agent registry entry upserted
           content:
             application/json:
               schema:
@@ -815,6 +832,7 @@ components:
     AgentRegisterRequest:
       type: object
       properties:
+        agent_id: { type: string }
         agent_key: { type: string }
         name: { type: string }
         description: { type: string }
@@ -823,6 +841,20 @@ components:
           type: array
           items: { type: string }
       required: [agent_key, name]
+    AgentSelfRegisterRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        type: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+        version: { type: string }
+        protocol_version: { type: string }
+        metadata_json:
+          type: object
+          additionalProperties: true
     AgentUpdateRequest:
       type: object
       properties:

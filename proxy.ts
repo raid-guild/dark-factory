@@ -7,6 +7,7 @@ const ALL_AUTH_ROLES: ApiKeyRole[] = ["admin", "human", "agent"];
 
 function requiredRolesForPath(pathname: string): ApiKeyRole[] {
   if (pathname === "/api/v1/agents/register") return ["admin"];
+  if (pathname === "/api/v1/agents/register-self") return ["agent", "admin"];
   if (/^\/api\/v1\/agents\/[^/]+$/.test(pathname)) return ["admin"];
   if (/^\/api\/v1\/agents\/[^/]+\/(heartbeat|events)$/.test(pathname)) return ["agent", "admin"];
   if (/^\/api\/v1\/approvals(\/|$)/.test(pathname)) return ["human", "admin"];

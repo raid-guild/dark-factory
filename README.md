@@ -1,5 +1,63 @@
 # dark-factory
 
+Dark Factory is an API-first coordination layer between humans, external agents, and downstream artifact systems.
+
+## System View
+
+```mermaid
+flowchart LR
+    H[Humans] -->|create runs approve review| DF[Dark Factory API]
+    A1[External Agent: Memory] -->|heartbeat events task updates| DF
+    A2[External Agent: Knowledge] -->|heartbeat events task updates| DF
+    A3[External Agent: Content] -->|heartbeat events task updates| DF
+    DF -->|task state approvals handoffs| DB[(Supabase Postgres)]
+    DF -->|artifact references only| AR[Artifact Systems]
+    AR --> Git[Git Repos]
+    AR --> KB[Knowledge Base]
+    AR --> Pub[Publishing Channels]
+```
+
+## Registry And Trust
+
+```mermaid
+flowchart TD
+    Admin[Admin or Trusted Operator] -->|issues bound API key| KeyReg[Key Registry]
+    KeyReg -->|agent key + bound agent_id| Agent[External Agent Runtime]
+    Agent -->|POST /agents/register-self| DF[Dark Factory API]
+    DF -->|upsert bound identity only| AgentReg[(Agent Registry)]
+    Admin -->|POST /agents/register| DF
+    DF -->|provision registry entry| AgentReg
+```
+
+## Runtime Activity Flow
+
+```mermaid
+sequenceDiagram
+    participant Human
+    participant DF as Dark Factory
+    participant Agent as External Agent
+    participant Store as Artifact Store
+
+    Human->>DF: Create workflow run
+    DF-->>Agent: Task becomes available
+    Agent->>DF: POST /agents/:id/heartbeat
+    Agent->>DF: POST /agents/:id/events (task.started)
+    Agent->>Store: Produce or update artifact
+    Agent->>DF: POST /artifacts
+    Agent->>DF: POST /agents/:id/events (task.completed)
+    Human->>DF: Approve or request revisions
+```
+
+## Agent Docs
+
+- Activity broadcast implementation guide: [docs/agent-activity-broadcast.md](docs/agent-activity-broadcast.md)
+
+## Agent Registry
+
+- `POST /api/v1/agents/register` is admin-only and should be treated as provisioning
+- `POST /api/v1/agents/register-self` is for trusted self-upsert after a key has already been issued
+- self-registration must derive identity from the authenticated key binding, not request payload
+
 ## API Write Auth (Current)
 
 All write requests to `/api/v1/*` (`POST`, `PUT`, `PATCH`, `DELETE`) require:
