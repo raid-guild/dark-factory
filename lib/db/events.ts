@@ -80,6 +80,23 @@ export async function createAgentEvent(input: EventInput) {
         ],
       );
 
+      if (input.taskId) {
+        await client.query(
+          `
+            insert into public.task_events (task_id, actor_id, event_type, payload)
+            values ($1::uuid, $2::uuid, $3, $4::jsonb)
+          `,
+          [
+            input.taskId,
+            agent.actor_id,
+            input.eventType,
+            JSON.stringify(
+              input.payload && typeof input.payload === "object" && !Array.isArray(input.payload) ? input.payload : {},
+            ),
+          ],
+        );
+      }
+
       return result.rows[0];
     });
   } catch (error) {

@@ -2,12 +2,13 @@ import { fail, ok, parseJson } from "@/lib/api/respond";
 import { getRequestAuthContext } from "@/lib/auth/request-auth";
 import { isDatabaseConfigError } from "@/lib/db/errors";
 import { claimTask } from "@/lib/db/task-mutations";
+import { mirrorTaskTransitionToAgentMail } from "@/lib/integrations/agent-mail/service";
 
 type Context = { params: Promise<{ taskId: string }> };
 
 export async function POST(request: Request, context: Context) {
   const { taskId } = await context.params;
-  await parseJson(request);
+  const body = await parseJson(request);
   const auth = getRequestAuthContext(request);
 
   try {
@@ -19,6 +20,20 @@ export async function POST(request: Request, context: Context) {
         current_status: result.currentStatus,
         next_status: result.nextStatus,
       });
+    }
+
+    if (auth.agentId) {
+      void mirrorTaskTransitionToAgentMail({
+        taskId: result.task.id,
+        workflowRunId: result.task.workflow_run_id,
+        senderName: auth.agentId,
+        taskTitle: result.task.title,
+        nextStatus: result.task.status,
+        blockedReason: null,
+        reservationPaths: Array.isArray(body.file_paths)
+          ? body.file_paths.filter((value): value is string => typeof value === "string")
+          : [],
+      }).catch(() => undefined);
     }
 
     return ok(result.task);
