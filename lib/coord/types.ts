@@ -28,6 +28,14 @@ export type WorkflowRun = {
   context_json?: Record<string, unknown>;
 };
 
+export type WorkflowTemplateSummary = {
+  id: string;
+  template_key: string;
+  name: string;
+  version: string;
+  active: boolean;
+};
+
 export type Task = {
   id: string;
   title: string;
@@ -48,4 +56,27 @@ export type AgentPresence = {
   current_task_id?: string;
   progress_pct?: number;
   last_heartbeat_at: string;
+};
+
+export type HandoffStatus = "created" | "accepted" | "declined" | "completed";
+
+export type Handoff = {
+  id: string;
+  from_task_id?: string;
+  to_task_id?: string;
+  from_actor_id?: string;
+  to_actor_id?: string;
+  note?: string;
+  status: HandoffStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TaskEvent = {
+  id: string;
+  task_id: string;
+  actor_id?: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
 };

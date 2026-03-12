@@ -473,6 +473,86 @@ code {
   margin: 1rem 0 1.25rem;
 }
 
+.create-run-panel {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.create-run-panel h2 {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-heading), Georgia, serif;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 400;
+}
+
+.create-run-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.create-run-field {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.create-run-field span {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  color: var(--forge-gold);
+  text-transform: uppercase;
+}
+
+.create-run-field select,
+.create-run-field input,
+.create-run-field textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+}
+
+.create-run-field textarea {
+  resize: vertical;
+  min-height: 10rem;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.create-run-field-wide {
+  grid-column: span 2;
+}
+
+.create-run-actions {
+  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.create-run-error,
+.create-run-success {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.create-run-error {
+  color: #ff9b86;
+}
+
+.create-run-success {
+  color: #bfe2a2;
+}
+
 .summary-card,
 .run-card,
 .presence-card,
@@ -805,6 +885,86 @@ code {
   color: inherit;
 }
 
+.drawer-section {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.drawer-section-head {
+  margin-bottom: 0.9rem;
+}
+
+.drawer-section-head h4,
+.drawer-section-head p {
+  margin: 0;
+}
+
+.drawer-section-head p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.handoff-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.handoff-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.task-event-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.handoff-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.8rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.handoff-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.handoff-card-head span,
+.handoff-card-meta {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.handoff-card-note {
+  margin: 0.55rem 0 0;
+}
+
+.task-event-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.8rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.task-event-payload {
+  margin: 0.6rem 0 0;
+  padding: 0.7rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text-secondary);
+  overflow-x: auto;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .activity-panel {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -834,6 +994,19 @@ code {
 
   .board-controls {
     grid-template-columns: 1fr;
+  }
+
+  .create-run-form {
+    grid-template-columns: 1fr;
+  }
+
+  .handoff-form {
+    grid-template-columns: 1fr;
+  }
+
+  .create-run-field-wide,
+  .create-run-actions {
+    grid-column: span 1;
   }
 
   .kanban-and-activity {

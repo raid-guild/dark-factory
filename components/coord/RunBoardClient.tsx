@@ -216,7 +216,7 @@ export function RunBoardClient({ runId }: Props) {
         </aside>
       </section>
 
-      <TaskDrawer onClose={() => setSelectedTask(null)} task={selectedTask} />
+      <TaskDrawer onClose={() => setSelectedTask(null)} relatedTasks={tasks} task={selectedTask} />
     </main>
   );
 }

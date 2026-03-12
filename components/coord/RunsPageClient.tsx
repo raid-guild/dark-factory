@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { StatusPill } from "@/components/coord/StatusPill";
 import { runStatusMeta } from "@/components/coord/status";
 import { mockRuns } from "@/lib/coord/mock";
-import type { WorkflowRun } from "@/lib/coord/types";
+import type { WorkflowRun, WorkflowTemplateSummary } from "@/lib/coord/types";
 
 async function loadRuns(): Promise<{ items: WorkflowRun[]; source: "api" | "mock" }> {
   try {
@@ -19,15 +20,43 @@ async function loadRuns(): Promise<{ items: WorkflowRun[]; source: "api" | "mock
   }
 }
 
+async function loadTemplates(): Promise<WorkflowTemplateSummary[]> {
+  try {
+    const response = await fetch("/api/v1/workflow-templates", { cache: "no-store" });
+    if (!response.ok) return [];
+    const data = (await response.json()) as { items?: WorkflowTemplateSummary[] };
+    return Array.isArray(data.items) ? data.items : [];
+  } catch {
+    return [];
+  }
+}
+
+const CREATE_RUN_KEY_STORAGE = "dark-factory-admin-api-key";
+
 export function RunsPageClient() {
   const [runs, setRuns] = useState<WorkflowRun[]>(mockRuns);
   const [source, setSource] = useState<"api" | "mock">("mock");
+  const [templates, setTemplates] = useState<WorkflowTemplateSummary[]>([]);
+  const [apiKey, setApiKey] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [contextJsonText, setContextJsonText] = useState('{\n  "topic": "New workflow run"\n}');
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     loadRuns().then((result) => {
       setRuns(result.items);
       setSource(result.source);
     });
+
+    loadTemplates().then((items) => {
+      setTemplates(items);
+      setSelectedTemplateId((current) => current || items[0]?.id || "");
+    });
+
+    const stored = window.localStorage.getItem(CREATE_RUN_KEY_STORAGE);
+    if (stored) setApiKey(stored);
   }, []);
 
   const statusCounts = useMemo(() => {
@@ -37,6 +66,71 @@ export function RunsPageClient() {
     }, {});
   }, [runs]);
 
+  async function refreshRuns() {
+    const result = await loadRuns();
+    setRuns(result.items);
+    setSource(result.source);
+  }
+
+  async function handleCreateRun(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCreateError(null);
+    setCreateSuccess(null);
+
+    if (!selectedTemplateId) {
+      setCreateError("Select a workflow template.");
+      return;
+    }
+
+    let contextJson: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(contextJsonText);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        setCreateError("context_json must be a JSON object.");
+        return;
+      }
+      contextJson = parsed as Record<string, unknown>;
+    } catch {
+      setCreateError("context_json must be valid JSON.");
+      return;
+    }
+
+    if (!apiKey.trim()) {
+      setCreateError("Enter an admin or human API key.");
+      return;
+    }
+
+    startTransition(async () => {
+      window.localStorage.setItem(CREATE_RUN_KEY_STORAGE, apiKey.trim());
+
+      const response = await fetch("/api/v1/workflow-runs", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-df-api-key": apiKey.trim(),
+        },
+        body: JSON.stringify({
+          workflow_template_id: selectedTemplateId,
+          context_json: contextJson,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        message?: string;
+        run?: WorkflowRun;
+        tasks_created?: number;
+      };
+
+      if (!response.ok) {
+        setCreateError(payload.message ?? "Failed to create workflow run.");
+        return;
+      }
+
+      setCreateSuccess(`Created run ${payload.run?.id ?? ""} with ${payload.tasks_created ?? 0} tasks.`);
+      await refreshRuns();
+    });
+  }
+
   return (
     <main className="container-custom">
       <p className="type-label-sm">WORKFLOW RUNS</p>
@@ -44,6 +138,53 @@ export function RunsPageClient() {
       <p className="type-body-md">
         {source === "api" ? "Live API data" : "Mock fallback data"} for workflow runs.
       </p>
+
+      <section className="landing-panel create-run-panel">
+        <div className="run-card-head">
+          <div>
+            <p className="type-label-sm">NEW RUN</p>
+            <h2>Create a workflow run from an active template.</h2>
+          </div>
+        </div>
+
+        <form className="create-run-form" onSubmit={handleCreateRun}>
+          <label className="create-run-field">
+            <span>Template</span>
+            <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+              <option value="">Select a template</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name} ({template.template_key}:{template.version})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="create-run-field">
+            <span>Write API key</span>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              placeholder="admin-local-1"
+              autoComplete="off"
+            />
+          </label>
+
+          <label className="create-run-field create-run-field-wide">
+            <span>Run context JSON</span>
+            <textarea value={contextJsonText} onChange={(event) => setContextJsonText(event.target.value)} rows={7} />
+          </label>
+
+          <div className="create-run-actions">
+            <button className="button-primary" type="submit" disabled={isPending}>
+              {isPending ? "Creating..." : "Create workflow run"}
+            </button>
+            {createError ? <p className="create-run-error">{createError}</p> : null}
+            {createSuccess ? <p className="create-run-success">{createSuccess}</p> : null}
+          </div>
+        </form>
+      </section>
 
       <section className="runs-summary">
         {Object.entries(statusCounts).map(([status, count]) => (

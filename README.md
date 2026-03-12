@@ -179,13 +179,21 @@ Completed:
 - [x] Wire `prism-coord` to Agent Mail with mirrored task messages and file reservations
 - [x] Normalize Agent Mail thread ids and stable agent-name mapping
 - [x] Port the themed landing page assets and add the hidden door entrance to `/runs`
+- [x] Add workflow template listing and workflow run creation from the API
+- [x] Add a minimal workflow-run creation UI on `/runs`
+- [x] Materialize seeded workflow templates into tasks and task dependencies
+- [x] Implement handoff persistence and task-scoped handoff reads
+- [x] Add handoff creation and handoff history in the task drawer
+- [x] Add a dedicated task event/activity view in the task drawer
+- [x] Draft the future inbox-driven agent runtime skill in [docs/future-agent-runtime-skill-draft.md](docs/future-agent-runtime-skill-draft.md)
 
 Next:
-- [ ] Add a dedicated task event/activity view in the UI
 - [ ] Show Agent Mail thread summary, unread counts, and reservation conflicts on runs/tasks surfaces
-- [ ] Implement handoff persistence and handoff UI
-- [ ] Implement workflow run creation/update flows from the UI instead of relying on seeded data
+- [ ] Expand workflow run creation/update flows beyond the current minimal create panel
+- [ ] Turn the future agent runtime skill draft into a real reusable Codex skill
+- [ ] Decide how workflow templates express agent routing (`owner_agent_key`, role, or capabilities)
 - [ ] Add startup env validation and a checked-in `.env.example`
 - [ ] Add automated tests for DB repositories and task transition routes
+- [ ] Add automated tests for workflow creation, handoffs, and task events
 - [ ] Decide whether to keep the current best-effort Agent Mail fire-and-forget behavior or move mirroring into a domain service/queue
 - [ ] Tighten Agent Mail auth/production hardening beyond the current bearer-token setup
