@@ -25,8 +25,8 @@ The MVP is successful when teams can:
 ## 3. Architecture (MVP)
 
 - `Next.js` app using Route Handlers (`app/api/*`)
-- `Supabase Postgres` as primary store
-- `Supabase Auth` for humans
+- `Postgres` as primary store
+- human auth provider to be decided
 - Agent auth via API keys/service tokens
 - Optional queue/cron later (initially synchronous API actions)
 
@@ -175,7 +175,7 @@ Base path: `/api/v1`
 }
 ```
 
-## 8. Supabase/Postgres Schema (first pass)
+## 8. Postgres Schema (first pass)
 
 ```sql
 create extension if not exists "pgcrypto";
@@ -410,7 +410,7 @@ lib/
     approvals/
     events/
   validators/
-supabase/
+db/
   migrations/
 docs/
   dark-factory-developer-brief.md

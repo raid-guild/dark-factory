@@ -210,6 +210,6 @@ Suggested retry approach:
 Current repo status:
 - route handlers for heartbeat and events exist but are still scaffold stubs
 - auth enforcement for agent keys is implemented
-- schema for `agent_presence` and `events` exists in the Supabase migration
+- schema for `agent_presence` and `events` exists in `db/migrations/20260307161000_initial_schema.sql`
 
 This guide defines the intended client behavior now, even before the backend persistence is fully implemented.

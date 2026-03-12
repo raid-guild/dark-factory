@@ -1,4 +1,6 @@
-import { parseJson, todo } from "@/lib/api/respond";
+import { fail, ok, parseJson, todo } from "@/lib/api/respond";
+import { isDatabaseConfigError } from "@/lib/db/errors";
+import { listTasks } from "@/lib/db/tasks";
 
 export async function POST(request: Request) {
   const body = await parseJson(request);
@@ -7,9 +9,19 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  return todo("GET /api/v1/tasks", {
-    status: searchParams.get("status"),
-    owner_agent_id: searchParams.get("owner_agent_id"),
-    workflow_run_id: searchParams.get("workflow_run_id"),
-  });
+  try {
+    const items = await listTasks({
+      status: searchParams.get("status"),
+      ownerAgentId: searchParams.get("owner_agent_id"),
+      workflowRunId: searchParams.get("workflow_run_id"),
+    });
+
+    return ok({ items });
+  } catch (error) {
+    if (isDatabaseConfigError(error)) {
+      return fail("Database is not configured", 503);
+    }
+
+    return fail("Failed to load tasks", 500);
+  }
 }

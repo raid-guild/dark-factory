@@ -68,7 +68,10 @@ export function proxy(request: NextRequest) {
   }
 
   if (matched.role === "agent") {
-    const agentPathMatch = pathname.match(/^\/api\/v1\/agents\/([^/]+)(?:\/|$)/);
+    const agentPathMatch =
+      pathname === "/api/v1/agents/register-self"
+        ? null
+        : pathname.match(/^\/api\/v1\/agents\/([^/]+)(?:\/|$)/);
     if (agentPathMatch) {
       if (!matched.agent_id) {
         return NextResponse.json(

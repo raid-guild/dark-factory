@@ -13,7 +13,7 @@
 - [x] Build and lint running clean
 
 ### Data Layer
-- [x] Supabase migration scaffold created
+- [x] Postgres migration scaffold created
 - [x] Core tables/enums/indexes defined:
   - agents, actor, presence, tasks, task_events, events
   - workflow_templates, workflow_runs
@@ -50,7 +50,7 @@
 ## Remaining For POC
 
 ### Critical Path (Must-Have)
-- [ ] Implement real Supabase DB calls in API routes (replace stubs)
+- [ ] Implement real Postgres DB calls in API routes (replace stubs)
 - [ ] Add task state transition enforcement server-side
 - [ ] Persist task moves from Kanban to API (not client-only)
 - [ ] Persist workflow events on each status change
@@ -86,7 +86,7 @@
 
 ### Deployment / Ops
 - [ ] Add `.env.example` with all required variables
-- [ ] Add Supabase project setup docs (local + hosted)
+- [ ] Add Postgres setup docs (local + hosted)
 - [ ] Add deploy target config (Vercel or equivalent)
 - [ ] Add POC runbook (start app, seed data, demo flow)
 

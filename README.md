@@ -10,7 +10,7 @@ flowchart LR
     A1[External Agent: Memory] -->|heartbeat events task updates| DF
     A2[External Agent: Knowledge] -->|heartbeat events task updates| DF
     A3[External Agent: Content] -->|heartbeat events task updates| DF
-    DF -->|task state approvals handoffs| DB[(Supabase Postgres)]
+    DF -->|task state approvals handoffs| DB[(Postgres)]
     DF -->|artifact references only| AR[Artifact Systems]
     AR --> Git[Git Repos]
     AR --> KB[Knowledge Base]
