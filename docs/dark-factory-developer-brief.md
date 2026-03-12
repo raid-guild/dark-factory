@@ -95,6 +95,7 @@ Base path: `/api/v1`
 
 ### Agents
 - `POST /agents/register`
+- `POST /agents/register-self`
 - `PATCH /agents/:agentId`
 - `POST /agents/:agentId/heartbeat`
 - `GET /agents/:agentId/presence`
@@ -344,6 +345,7 @@ create index idx_artifacts_workflow_run_id on artifacts(workflow_run_id);
 ## 9. Authorization Model (MVP)
 
 ### Agents
+- Can self-register only the identity bound to their API key
 - Can update only own presence
 - Can emit events for own actor identity
 - Can claim/start/block/complete tasks for allowed task types
@@ -355,9 +357,25 @@ create index idx_artifacts_workflow_run_id on artifacts(workflow_run_id);
 - Can comment and inspect artifacts
 
 ### Admins
+- Can provision new agent registry entries
 - Can override task/workflow status
 - Can reassign tasks
 - Can resolve deadlocks and blocked flows
+
+## 9.1 Registry Model
+
+Provisioning and registration are separate concerns.
+
+- `POST /agents/register`
+  - admin only
+  - creates or provisions a trusted agent registry entry
+- `POST /agents/register-self`
+  - agent or admin
+  - upserts metadata for the identity already bound to the caller key
+
+Important rule:
+- self-registration must never create trust from request payload alone
+- authoritative identity comes from the authenticated key binding, not from body fields
 
 ## 10. Observability and Audit
 
