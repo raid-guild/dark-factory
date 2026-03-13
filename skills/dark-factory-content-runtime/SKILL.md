@@ -11,6 +11,16 @@ This skill assumes:
 - `prism-coord` is the control plane for workflow runs, tasks, handoffs, approvals, and task state
 - Agent Mail is the communication plane for inboxes, workflow threads, durable handoff context, and file reservations
 
+## Preflight
+
+Before using this skill, confirm:
+- the repo has access to `prism-coord`
+- the agent has a bound API key for `prism-coord`
+- Agent Mail access is configured for the current project
+- the active project uses the shared conventions below
+
+If any of those are missing, stop and ask for the missing runtime details instead of guessing.
+
 ## Hard Rules
 
 - Treat `prism-coord` as the source of truth for task state.
@@ -95,6 +105,11 @@ Typical `prism-coord` calls:
 
 Use the bound API key and do not write under another agent’s identity.
 
+Typical identity pattern:
+- key bound to `agent_id`
+- `POST /api/v1/agents/register-self` once the runtime is provisioned
+- then heartbeat, events, and task transitions under that same bound identity
+
 ## Communication-Plane Calls
 
 Typical Agent Mail operations:
@@ -103,6 +118,8 @@ Typical Agent Mail operations:
 - send task-specific messages using `[task:<task_id>] ...`
 - reserve files with reason `task:<task_id>`
 - release reservations when the task is done or reassigned
+
+If Agent Mail agent names differ from `prism-coord` agent ids, rely on the configured stable mapping rather than inventing new names.
 
 ## Good Default Behavior
 
