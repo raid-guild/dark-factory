@@ -95,6 +95,52 @@ sequenceDiagram
 - The landing page is intentionally product-facing; the operator surface begins at `/runs`
 - Future runtime skill draft: [docs/future-agent-runtime-skill-draft.md](docs/future-agent-runtime-skill-draft.md)
 - Reusable content-agent skill: [skills/dark-factory-content-runtime/SKILL.md](skills/dark-factory-content-runtime/SKILL.md)
+- Minimal two-agent content workflow walkthrough: [docs/minimal-content-workflow-e2e.md](docs/minimal-content-workflow-e2e.md)
+
+### Installing And Using The Skill
+
+The repo skill is stored in:
+
+- [skills/dark-factory-content-runtime/SKILL.md](skills/dark-factory-content-runtime/SKILL.md)
+
+To make it available to another Codex agent, copy or symlink the whole skill folder into that agent's Codex skills directory:
+
+```bash
+mkdir -p "$HOME/.codex/skills"
+cp -R skills/dark-factory-content-runtime "$HOME/.codex/skills/dark-factory-content-runtime"
+```
+
+Or symlink it so updates in this repo stay live:
+
+```bash
+mkdir -p "$HOME/.codex/skills"
+ln -s "$(pwd)/skills/dark-factory-content-runtime" "$HOME/.codex/skills/dark-factory-content-runtime"
+```
+
+After that, a Codex session can trigger it by:
+
+- naming the skill: `dark-factory-content-runtime`
+- or asking for the matching workflow explicitly, for example:
+  - "check Agent Mail for Dark Factory content tasks and work the inbox-driven loop"
+  - "use the Dark Factory content runtime skill for this workflow"
+
+What the agent still needs at runtime:
+
+- access to the `prism-coord` repo/workspace
+- a bound Dark Factory API key
+- `DATABASE_URL` if it is running the local app
+- `AGENT_MAIL_URL`
+- `AGENT_MAIL_BEARER_TOKEN`
+- optionally `AGENT_MAIL_PROJECT_KEY` and `AGENT_MAIL_AGENT_MAP_JSON`
+
+Recommended setup for a working agent:
+
+1. install the skill into `~/.codex/skills`
+2. give the agent access to the `prism-coord` workspace
+3. provide the bound API key and Agent Mail env vars
+4. tell the agent which workflow run or inbox/project it should operate on
+
+The skill does not replace runtime provisioning. It standardizes behavior once the agent has access.
 
 ## Agent Registry
 

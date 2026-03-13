@@ -263,6 +263,28 @@ export function getFallbackTemplateTasks(templateKey: string, version: string): 
     ];
   }
 
+  if (templateRef === "content_brief_to_draft:v1") {
+    return [
+      {
+        key: "brief",
+        title: "Build research brief",
+        description: "Gather the topic context, relevant source angles, constraints, and a concise recommended framing for the draft.",
+        task_type: "memory.research",
+        priority: "high",
+        owner_agent_key: "agent-memory",
+      },
+      {
+        key: "draft",
+        title: "Draft content output",
+        description: "Turn the approved brief into the requested content output while following the operator guidance in the run context.",
+        task_type: "content.drafting",
+        priority: "high",
+        owner_agent_key: "agent-content",
+        depends_on: ["brief"],
+      },
+    ];
+  }
+
   return [];
 }
 

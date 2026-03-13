@@ -78,6 +78,20 @@ values
       ]
     }'::jsonb,
     true
+  ),
+  (
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    'content_brief_to_draft',
+    'Content Brief To Draft',
+    'v1',
+    '{
+      "stages":["brief","draft"],
+      "tasks":[
+        {"key":"brief","title":"Build research brief","task_type":"memory.research","priority":"high","owner_agent_key":"agent-memory","description":"Gather the topic context, relevant source angles, constraints, and a concise recommended framing for the draft."},
+        {"key":"draft","title":"Draft content output","task_type":"content.drafting","priority":"high","owner_agent_key":"agent-content","depends_on":["brief"],"description":"Turn the approved brief into the requested content output while following the operator guidance in the run context."}
+      ]
+    }'::jsonb,
+    true
   )
 on conflict (template_key, version) do update
 set
