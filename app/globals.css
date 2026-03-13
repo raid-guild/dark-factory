@@ -874,6 +874,11 @@ code {
   opacity: 0.35;
 }
 
+.task-card-approval {
+  border-color: rgba(248, 206, 92, 0.52);
+  background: linear-gradient(180deg, rgba(248, 206, 92, 0.08), rgba(255, 255, 255, 0.01));
+}
+
 .task-card-head {
   display: flex;
   gap: 0.5rem;

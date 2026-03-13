@@ -4,12 +4,14 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { StatusPill } from "@/components/coord/StatusPill";
 import { taskStatusMeta } from "@/components/coord/status";
-import type { Handoff, Task, TaskEvent } from "@/lib/coord/types";
+import type { Handoff, Task, TaskEvent, TaskRelationSummary } from "@/lib/coord/types";
 
 type Props = {
   task: Task | null;
   relatedTasks: Task[];
+  runContext?: Record<string, unknown>;
   onClose: () => void;
+  onTaskMutated: (taskId: string) => Promise<void>;
 };
 
 const WRITE_KEY_STORAGE = "dark-factory-admin-api-key";
@@ -36,14 +38,24 @@ type TaskMailSummary = {
   reservation_conflicts: number;
 };
 
-export function TaskDrawer({ task, relatedTasks, onClose }: Props) {
+type TaskRelations = {
+  depends_on: TaskRelationSummary[];
+  dependents: TaskRelationSummary[];
+};
+
+export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMutated }: Props) {
   const [handoffs, setHandoffs] = useState<Handoff[]>([]);
   const [events, setEvents] = useState<TaskEvent[]>([]);
   const [mailSummary, setMailSummary] = useState<TaskMailSummary | null>(null);
+  const [relations, setRelations] = useState<TaskRelations>({ depends_on: [], dependents: [] });
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem(WRITE_KEY_STORAGE) ?? "";
   });
+  const [filePathsText, setFilePathsText] = useState("");
+  const [blockedReason, setBlockedReason] = useState(task?.blocked_reason ?? "");
+  const [completionNote, setCompletionNote] = useState("");
+  const [mutationPending, setMutationPending] = useState<string | null>(null);
   const [targetTaskId, setTargetTaskId] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +65,7 @@ export function TaskDrawer({ task, relatedTasks, onClose }: Props) {
     if (!task) return [];
     return relatedTasks.filter((candidate) => candidate.id !== task.id);
   }, [relatedTasks, task]);
+  const latestHandoff = handoffs[0] ?? null;
 
   useEffect(() => {
     if (!task) return;
@@ -80,7 +93,107 @@ export function TaskDrawer({ task, relatedTasks, onClose }: Props) {
       })
       .then((payload) => setMailSummary(payload))
       .catch(() => setMailSummary(null));
+
+    fetch(`/api/v1/tasks/${task.id}/relations`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return { depends_on: [] as TaskRelationSummary[], dependents: [] as TaskRelationSummary[] };
+        return (await response.json()) as TaskRelations;
+      })
+      .then((payload) =>
+        setRelations({
+          depends_on: Array.isArray(payload.depends_on) ? payload.depends_on : [],
+          dependents: Array.isArray(payload.dependents) ? payload.dependents : [],
+        }),
+      )
+      .catch(() => setRelations({ depends_on: [], dependents: [] }));
   }, [task]);
+
+  function parseFilePaths() {
+    return filePathsText
+      .split("\n")
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  async function refreshTaskPanels() {
+    if (!task) return;
+
+    const [eventsResponse, handoffsResponse, mailResponse, relationsResponse] = await Promise.all([
+      fetch(`/api/v1/tasks/${task.id}/events`, { cache: "no-store" }),
+      fetch(`/api/v1/tasks/${task.id}/handoffs`, { cache: "no-store" }),
+      fetch(`/api/v1/tasks/${task.id}/mail-summary`, { cache: "no-store" }),
+      fetch(`/api/v1/tasks/${task.id}/relations`, { cache: "no-store" }),
+    ]);
+
+    if (eventsResponse.ok) {
+      const payload = (await eventsResponse.json()) as { items?: TaskEvent[] };
+      setEvents(Array.isArray(payload.items) ? payload.items : []);
+    }
+
+    if (handoffsResponse.ok) {
+      const payload = (await handoffsResponse.json()) as { items?: Handoff[] };
+      setHandoffs(Array.isArray(payload.items) ? payload.items : []);
+    }
+
+    if (mailResponse.ok) {
+      setMailSummary((await mailResponse.json()) as TaskMailSummary);
+    }
+
+    if (relationsResponse.ok) {
+      const payload = (await relationsResponse.json()) as TaskRelations;
+      setRelations({
+        depends_on: Array.isArray(payload.depends_on) ? payload.depends_on : [],
+        dependents: Array.isArray(payload.dependents) ? payload.dependents : [],
+      });
+    }
+  }
+
+  async function mutateTask(action: "claim" | "start" | "block" | "complete") {
+    if (!task) return;
+    setError(null);
+    setSuccess(null);
+
+    if (!apiKey.trim()) {
+      setError("Enter a write API key.");
+      return;
+    }
+
+    const payload: Record<string, unknown> = {};
+    const filePaths = parseFilePaths();
+    if (filePaths.length) payload.file_paths = filePaths;
+    if (action === "block") {
+      if (!blockedReason.trim()) {
+        setError("Enter a blocked reason.");
+        return;
+      }
+      payload.blocked_reason = blockedReason.trim();
+    }
+    if (action === "complete" && completionNote.trim()) {
+      payload.completion_note = completionNote.trim();
+    }
+
+    setMutationPending(action);
+    const response = await fetch(`/api/v1/tasks/${task.id}/${action}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-df-api-key": apiKey.trim(),
+      },
+      body: JSON.stringify(payload),
+    });
+    setMutationPending(null);
+
+    const body = (await response.json()) as Task & { message?: string };
+    if (!response.ok) {
+      setError(body.message ?? `Failed to ${action} task.`);
+      return;
+    }
+
+    window.localStorage.setItem(WRITE_KEY_STORAGE, apiKey.trim());
+    setSuccess(`Task ${action === "complete" ? "completed" : action === "block" ? "blocked" : action === "start" ? "started" : "claimed"}.`);
+    await onTaskMutated(task.id);
+    await refreshTaskPanels();
+  }
 
   async function handleCreateHandoff(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -185,11 +298,162 @@ export function TaskDrawer({ task, relatedTasks, onClose }: Props) {
           </>
         ) : null}
 
-        <div className="drawer-actions">
-          <button type="button">Mark In Progress</button>
-          <button type="button">Request Approval</button>
-          <button type="button">Attach Artifact</button>
-        </div>
+        <section className="drawer-section">
+          <div className="drawer-section-head">
+            <h4>Operate task</h4>
+            <p>Operators use the same task lifecycle APIs that agents use.</p>
+          </div>
+
+          <div className="drawer-actions">
+            {task.status === "queued" ? (
+              <button disabled={mutationPending !== null} onClick={() => void mutateTask("claim")} type="button">
+                {mutationPending === "claim" ? "Claiming..." : "Claim"}
+              </button>
+            ) : null}
+            {(task.status === "claimed" || task.status === "blocked") ? (
+              <button disabled={mutationPending !== null} onClick={() => void mutateTask("start")} type="button">
+                {mutationPending === "start" ? "Starting..." : task.status === "blocked" ? "Resume" : "Start"}
+              </button>
+            ) : null}
+            {(task.status === "in_progress" || task.status === "claimed") ? (
+              <button disabled={mutationPending !== null} onClick={() => void mutateTask("block")} type="button">
+                {mutationPending === "block" ? "Blocking..." : "Block"}
+              </button>
+            ) : null}
+            {(task.status === "in_progress" || task.status === "waiting_approval") ? (
+              <button className="button-primary" disabled={mutationPending !== null} onClick={() => void mutateTask("complete")} type="button">
+                {mutationPending === "complete" ? "Completing..." : "Complete"}
+              </button>
+            ) : null}
+          </div>
+
+          <div className="handoff-form">
+            <label className="create-run-field create-run-field-wide">
+              <span>Reservation file paths</span>
+              <textarea
+                rows={4}
+                value={filePathsText}
+                onChange={(event) => setFilePathsText(event.target.value)}
+                placeholder={"content/draft.md\ncontent/brief.md"}
+              />
+            </label>
+
+            <label className="create-run-field create-run-field-wide">
+              <span>Blocked reason</span>
+              <textarea
+                rows={3}
+                value={blockedReason}
+                onChange={(event) => setBlockedReason(event.target.value)}
+                placeholder="What is preventing this task from moving forward?"
+              />
+            </label>
+
+            <label className="create-run-field create-run-field-wide">
+              <span>Completion note</span>
+              <textarea
+                rows={3}
+                value={completionNote}
+                onChange={(event) => setCompletionNote(event.target.value)}
+                placeholder="Optional operator note for completion context"
+              />
+            </label>
+
+            <label className="create-run-field">
+              <span>Write API key</span>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder="admin-local-1"
+                autoComplete="off"
+              />
+            </label>
+          </div>
+
+          {error ? <p className="create-run-error">{error}</p> : null}
+          {success ? <p className="create-run-success">{success}</p> : null}
+        </section>
+
+        <section className="drawer-section">
+          <div className="drawer-section-head">
+            <h4>Task context</h4>
+            <p>
+              {task.task_type === "human.approval"
+                ? "This task is an approval gate in the content flow."
+                : task.owner_agent_id
+                  ? `Assigned to ${task.owner_agent_id}.`
+                  : "Currently unassigned."}
+            </p>
+          </div>
+
+          {runContext && Object.keys(runContext).length ? (
+            <article className="task-event-card">
+              <div className="handoff-card-head">
+                <strong>Run context</strong>
+              </div>
+              <pre className="task-event-payload">{JSON.stringify(runContext, null, 2)}</pre>
+            </article>
+          ) : null}
+
+          {latestHandoff?.note ? (
+            <article className="task-event-card">
+              <div className="handoff-card-head">
+                <strong>Latest handoff</strong>
+                <span>{new Date(latestHandoff.created_at).toLocaleString()}</span>
+              </div>
+              <p className="handoff-card-meta">
+                {latestHandoff.from_task_id === task.id ? "Outgoing" : "Incoming"} handoff context
+              </p>
+              <p className="handoff-card-note">{latestHandoff.note}</p>
+            </article>
+          ) : null}
+
+          <div className="task-event-list">
+            <article className="task-event-card">
+              <div className="handoff-card-head">
+                <strong>Depends on</strong>
+                <span>{relations.depends_on.length}</span>
+              </div>
+              {relations.depends_on.length ? (
+                <div className="mail-summary-list">
+                  {relations.depends_on.map((item) => (
+                    <div key={item.id} className="mail-summary-item">
+                      <p>{item.title}</p>
+                      <span>
+                        {item.task_type} • {taskStatusMeta[item.status].label}
+                        {item.owner_agent_id ? ` • ${item.owner_agent_id}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="type-body-md">This task has no prerequisite tasks.</p>
+              )}
+            </article>
+
+            <article className="task-event-card">
+              <div className="handoff-card-head">
+                <strong>Unlocks</strong>
+                <span>{relations.dependents.length}</span>
+              </div>
+              {relations.dependents.length ? (
+                <div className="mail-summary-list">
+                  {relations.dependents.map((item) => (
+                    <div key={item.id} className="mail-summary-item">
+                      <p>{item.title}</p>
+                      <span>
+                        {item.task_type} • {taskStatusMeta[item.status].label}
+                        {item.owner_agent_id ? ` • ${item.owner_agent_id}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="type-body-md">No downstream tasks depend on this task yet.</p>
+              )}
+            </article>
+          </div>
+        </section>
 
         <section className="drawer-section">
           <div className="drawer-section-head">

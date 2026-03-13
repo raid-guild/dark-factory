@@ -75,13 +75,34 @@ export function RunBoardClient({ runId }: Props) {
   const [hideDone, setHideDone] = useState(false);
   const [activity, setActivity] = useState<string[]>([]);
   const [mailSummary, setMailSummary] = useState<WorkflowRunMailSummary | null>(null);
-  const [runApiKey, setRunApiKey] = useState("");
+  const [runApiKey, setRunApiKey] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem("dark-factory-admin-api-key") ?? "";
+  });
   const [runContextText, setRunContextText] = useState("{\n}");
   const [runStatusDraft, setRunStatusDraft] = useState<WorkflowRun["status"]>("running");
   const [runUpdateError, setRunUpdateError] = useState<string | null>(null);
   const [runUpdateSuccess, setRunUpdateSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activityExpanded, setActivityExpanded] = useState(false);
+
+  async function refreshBoardData() {
+    const [runResult, tasksResult, mailResult] = await Promise.all([loadRun(runId), loadTasks(runId), loadMailSummary(runId)]);
+    const fallbackRun = mockRuns.find((item) => item.id === runId) ?? null;
+    const nextRun = runResult ?? fallbackRun;
+    const nextTasks = tasksResult && tasksResult.length > 0 ? tasksResult : mockTasks.filter((t) => t.workflow_run_id === runId);
+
+    setRun(nextRun);
+    setTasks(nextTasks);
+    setSource(runResult || tasksResult ? "api" : "mock");
+    setPresence(mockPresence);
+    setMailSummary(mailResult);
+    if (nextRun) {
+      setRunStatusDraft(nextRun.status);
+      setRunContextText(JSON.stringify(nextRun.context_json ?? {}, null, 2));
+    }
+    return nextTasks;
+  }
 
   useEffect(() => {
     Promise.all([loadRun(runId), loadTasks(runId), loadMailSummary(runId)]).then(([runResult, tasksResult, mailResult]) => {
@@ -98,8 +119,6 @@ export function RunBoardClient({ runId }: Props) {
         setRunStatusDraft(nextRun.status);
         setRunContextText(JSON.stringify(nextRun.context_json ?? {}, null, 2));
       }
-      const stored = window.localStorage.getItem("dark-factory-admin-api-key");
-      if (stored) setRunApiKey(stored);
       setIsLoading(false);
     });
   }, [runId]);
@@ -422,7 +441,22 @@ export function RunBoardClient({ runId }: Props) {
         </aside>
       </section>
 
-      <TaskDrawer key={selectedTask?.id ?? "task-drawer"} onClose={() => setSelectedTask(null)} relatedTasks={tasks} task={selectedTask} />
+      <TaskDrawer
+        key={
+          selectedTask
+            ? `${selectedTask.id}:${selectedTask.status}:${selectedTask.blocked_reason ?? ""}`
+            : "task-drawer"
+        }
+        onClose={() => setSelectedTask(null)}
+        onTaskMutated={async (updatedTaskId) => {
+          const refreshed = await refreshBoardData();
+          const nextSelected = refreshed.find((item) => item.id === updatedTaskId) ?? null;
+          setSelectedTask(nextSelected);
+        }}
+        relatedTasks={tasks}
+        runContext={run.context_json}
+        task={selectedTask}
+      />
     </main>
   );
 }

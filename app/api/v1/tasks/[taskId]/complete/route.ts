@@ -10,9 +10,10 @@ export async function POST(request: Request, context: Context) {
   const { taskId } = await context.params;
   const body = await parseJson(request);
   const auth = getRequestAuthContext(request);
+  const completionNote = typeof body.completion_note === "string" ? body.completion_note.trim() : "";
 
   try {
-    const result = await completeTask(taskId, auth.agentId);
+    const result = await completeTask(taskId, auth.agentId, completionNote || null);
     if (result.kind === "not_found") return fail("Task not found", 404, { taskId });
     if (result.kind === "invalid_transition") {
       return fail("Invalid task transition", 409, {

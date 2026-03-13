@@ -11,9 +11,21 @@ type Props = {
 };
 
 export function TaskCard({ task, onSelect, onDragStart, onDragEnd, isDragging }: Props) {
+  const ownerLabel =
+    task.task_type === "human.approval" && !task.owner_agent_id
+      ? "Human approval required"
+      : task.owner_agent_id ?? "unassigned";
+  const cardClassName = [
+    "task-card",
+    isDragging ? "task-card-dragging" : "",
+    task.task_type === "human.approval" ? "task-card-approval" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <button
-      className={`task-card ${isDragging ? "task-card-dragging" : ""}`}
+      className={cardClassName}
       draggable
       onClick={() => onSelect(task)}
       onDragEnd={onDragEnd}
@@ -29,7 +41,7 @@ export function TaskCard({ task, onSelect, onDragStart, onDragEnd, isDragging }:
       </div>
       <p className="task-card-meta">{task.task_type}</p>
       <p className="task-card-meta">
-        Owner: <span>{task.owner_agent_id ?? "unassigned"}</span>
+        Owner: <span>{ownerLabel}</span>
       </p>
       {task.blocked_reason ? <p className="task-blocked-note">{task.blocked_reason}</p> : null}
     </button>

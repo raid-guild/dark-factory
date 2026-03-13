@@ -57,6 +57,14 @@ export type Task = {
   due_at?: string;
 };
 
+export type TaskRelationSummary = {
+  id: string;
+  title: string;
+  task_type: string;
+  status: TaskStatus;
+  owner_agent_id?: string;
+};
+
 export type AgentPresence = {
   agent_id: string;
   agent_name: string;

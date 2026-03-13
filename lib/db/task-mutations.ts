@@ -117,6 +117,7 @@ async function transitionTask(
   nextStatus: TaskStatus,
   agentKey: string | null,
   blockedReason?: string | null,
+  note?: string | null,
 ) {
   const current = await loadTaskForUpdate(client, taskId);
   if (!current) {
@@ -169,6 +170,7 @@ async function transitionTask(
     from_status: current.status,
     to_status: nextStatus,
     blocked_reason: blockedReason ?? null,
+    note: note ?? null,
     owner_agent_id: updated.owner_agent_id ?? null,
   });
 
@@ -177,7 +179,7 @@ async function transitionTask(
 
 export async function claimTask(taskId: string, agentKey: string | null) {
   try {
-    return await withTransaction((client) => transitionTask(client, taskId, "claimed", agentKey, null));
+    return await withTransaction((client) => transitionTask(client, taskId, "claimed", agentKey, null, null));
   } catch (error) {
     mapDbError(error);
   }
@@ -185,7 +187,7 @@ export async function claimTask(taskId: string, agentKey: string | null) {
 
 export async function startTask(taskId: string, agentKey: string | null) {
   try {
-    return await withTransaction((client) => transitionTask(client, taskId, "in_progress", agentKey, null));
+    return await withTransaction((client) => transitionTask(client, taskId, "in_progress", agentKey, null, null));
   } catch (error) {
     mapDbError(error);
   }
@@ -193,15 +195,15 @@ export async function startTask(taskId: string, agentKey: string | null) {
 
 export async function blockTask(taskId: string, agentKey: string | null, blockedReason: string | null) {
   try {
-    return await withTransaction((client) => transitionTask(client, taskId, "blocked", agentKey, blockedReason));
+    return await withTransaction((client) => transitionTask(client, taskId, "blocked", agentKey, blockedReason, null));
   } catch (error) {
     mapDbError(error);
   }
 }
 
-export async function completeTask(taskId: string, agentKey: string | null) {
+export async function completeTask(taskId: string, agentKey: string | null, note: string | null = null) {
   try {
-    return await withTransaction((client) => transitionTask(client, taskId, "completed", agentKey, null));
+    return await withTransaction((client) => transitionTask(client, taskId, "completed", agentKey, null, note));
   } catch (error) {
     mapDbError(error);
   }
