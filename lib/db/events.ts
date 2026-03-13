@@ -1,5 +1,5 @@
 import { DatabaseConfigError } from "@/lib/db/errors";
-import { query, withTransaction } from "@/lib/db/pool";
+import { withTransaction } from "@/lib/db/pool";
 
 type EventInput = {
   agentKey: string;

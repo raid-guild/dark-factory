@@ -37,8 +37,12 @@ export function RunsPageClient() {
   const [runs, setRuns] = useState<WorkflowRun[]>(mockRuns);
   const [source, setSource] = useState<"api" | "mock">("mock");
   const [templates, setTemplates] = useState<WorkflowTemplateSummary[]>([]);
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey, setApiKey] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(CREATE_RUN_KEY_STORAGE) ?? "";
+  });
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [initialStatus, setInitialStatus] = useState<WorkflowRun["status"]>("pending");
   const [contextJsonText, setContextJsonText] = useState('{\n  "topic": "New workflow run"\n}');
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
@@ -54,9 +58,6 @@ export function RunsPageClient() {
       setTemplates(items);
       setSelectedTemplateId((current) => current || items[0]?.id || "");
     });
-
-    const stored = window.localStorage.getItem(CREATE_RUN_KEY_STORAGE);
-    if (stored) setApiKey(stored);
   }, []);
 
   const statusCounts = useMemo(() => {
@@ -65,6 +66,11 @@ export function RunsPageClient() {
       return acc;
     }, {});
   }, [runs]);
+
+  const selectedTemplate = useMemo(
+    () => templates.find((template) => template.id === selectedTemplateId) ?? null,
+    [selectedTemplateId, templates],
+  );
 
   async function refreshRuns() {
     const result = await loadRuns();
@@ -111,6 +117,7 @@ export function RunsPageClient() {
         },
         body: JSON.stringify({
           workflow_template_id: selectedTemplateId,
+          status: initialStatus,
           context_json: contextJson,
         }),
       });
@@ -171,10 +178,43 @@ export function RunsPageClient() {
             />
           </label>
 
+          <label className="create-run-field">
+            <span>Initial status</span>
+            <select value={initialStatus} onChange={(event) => setInitialStatus(event.target.value as WorkflowRun["status"])}>
+              {Object.keys(runStatusMeta).map((status) => (
+                <option key={status} value={status}>
+                  {runStatusMeta[status as WorkflowRun["status"]].label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <label className="create-run-field create-run-field-wide">
             <span>Run context JSON</span>
             <textarea value={contextJsonText} onChange={(event) => setContextJsonText(event.target.value)} rows={7} />
           </label>
+
+          {selectedTemplate?.tasks?.length ? (
+            <div className="create-run-template-preview">
+              <div className="drawer-section-head">
+                <h4>Template task preview</h4>
+                <p>{selectedTemplate.tasks.length} tasks will be materialized</p>
+              </div>
+              <div className="mail-summary-list">
+                {selectedTemplate.tasks.map((task) => (
+                  <div className="mail-summary-item" key={task.key}>
+                    <p>
+                      {task.title} <span className="type-label-sm">({task.task_type})</span>
+                    </p>
+                    <span>
+                      owner: {task.owner_agent_key ?? "unassigned"} • priority: {task.priority}
+                      {task.depends_on?.length ? ` • depends on: ${task.depends_on.join(", ")}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="create-run-actions">
             <button className="button-primary" type="submit" disabled={isPending}>

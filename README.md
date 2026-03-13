@@ -26,13 +26,21 @@ Optional Agent Mail integration vars:
 ```bash
 AGENT_MAIL_URL=https://mcp-agent-mail-production-ae0a.up.railway.app/mcp/
 AGENT_MAIL_BEARER_TOKEN=...
+AGENT_MAIL_WEB_URL=https://mcp-agent-mail-production-ae0a.up.railway.app
 AGENT_MAIL_PROJECT_KEY=/absolute/path/to/prism-coord
 AGENT_MAIL_AGENT_MAP_JSON='{"agent-memory":"AmberOtter"}'
+```
+
+Or copy the checked-in example:
+
+```bash
+cp .env.example .env.local
 ```
 
 Notes:
 - local development should use the public Postgres URL, not Railway's internal `postgres.railway.internal` hostname
 - deployed Railway services should use internal service URLs/variable references
+- startup validates `DATABASE_URL`, API key JSON shape, and basic Agent Mail env coherence
 - the homepage now includes a hidden entrance: knock three times on the door to reveal the `/runs` dashboard
 
 ## System View
@@ -85,6 +93,8 @@ sequenceDiagram
 
 - Activity broadcast implementation guide: [docs/agent-activity-broadcast.md](docs/agent-activity-broadcast.md)
 - The landing page is intentionally product-facing; the operator surface begins at `/runs`
+- Future runtime skill draft: [docs/future-agent-runtime-skill-draft.md](docs/future-agent-runtime-skill-draft.md)
+- Reusable content-agent skill: [skills/dark-factory-content-runtime/SKILL.md](skills/dark-factory-content-runtime/SKILL.md)
 
 ## Agent Registry
 
@@ -165,6 +175,11 @@ Conventions:
 
 ## Checklist
 
+Current focus:
+- validate the content workflow path end to end before expanding into software-delivery or PR-driven flows
+- keep `prism-coord` as the control plane and Agent Mail as the communication plane
+- use the current content templates and agent roles as the main dogfood scenario
+
 Completed:
 - [x] Provision Railway Postgres and apply the initial schema
 - [x] Rename repo schema layout from `supabase/migrations` to `db/migrations`
@@ -185,15 +200,19 @@ Completed:
 - [x] Implement handoff persistence and task-scoped handoff reads
 - [x] Add handoff creation and handoff history in the task drawer
 - [x] Add a dedicated task event/activity view in the task drawer
+- [x] Show Agent Mail thread summary, unread counts, and reservation conflicts on runs/tasks surfaces
+- [x] Add Agent Mail project/thread links to run and task surfaces
+- [x] Expand workflow run update flow with a run controls panel on `/runs`
+- [x] Expand workflow run creation beyond the minimal panel with initial status selection and template task previews
+- [x] Establish `owner_agent_key` as the current template-routing convention in seeded content templates
+- [x] Add startup env validation and a checked-in `.env.example`
+- [x] Add automated tests for workflow creation, handoffs, task events, and task transition routes
 - [x] Draft the future inbox-driven agent runtime skill in [docs/future-agent-runtime-skill-draft.md](docs/future-agent-runtime-skill-draft.md)
+- [x] Turn the future agent runtime draft into a reusable repo skill at [skills/dark-factory-content-runtime/SKILL.md](skills/dark-factory-content-runtime/SKILL.md)
 
 Next:
-- [ ] Show Agent Mail thread summary, unread counts, and reservation conflicts on runs/tasks surfaces
-- [ ] Expand workflow run creation/update flows beyond the current minimal create panel
-- [ ] Turn the future agent runtime skill draft into a real reusable Codex skill
-- [ ] Decide how workflow templates express agent routing (`owner_agent_key`, role, or capabilities)
-- [ ] Add startup env validation and a checked-in `.env.example`
-- [ ] Add automated tests for DB repositories and task transition routes
-- [ ] Add automated tests for workflow creation, handoffs, and task events
+- [ ] Add richer task-level operator actions beyond the current read-heavy drawer and handoff form
+- [ ] Evolve workflow template routing beyond the current `owner_agent_key` convention into role/capability-aware routing
+- [ ] Add richer env validation around Railway/local mode assumptions if local onboarding stays rough
 - [ ] Decide whether to keep the current best-effort Agent Mail fire-and-forget behavior or move mirroring into a domain service/queue
-- [ ] Tighten Agent Mail auth/production hardening beyond the current bearer-token setup
+- [ ] Tighten Agent Mail auth/production hardening beyond the current bearer-token setup, using [docs/agent-mail-hardening-notes.md](docs/agent-mail-hardening-notes.md) as the baseline

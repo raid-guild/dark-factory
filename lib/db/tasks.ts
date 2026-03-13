@@ -99,3 +99,32 @@ export async function listTasks(filters: TaskFilters): Promise<Task[]> {
     mapDbError(error);
   }
 }
+
+export async function getTaskById(taskId: string): Promise<Task | null> {
+  try {
+    const result = await query<TaskRow>(
+      `
+        select
+          t.id,
+          t.title,
+          t.description,
+          t.task_type,
+          t.status,
+          t.priority,
+          coalesce(a.agent_key, t.owner_agent_id::text) as owner_agent_id,
+          t.workflow_run_id::text as workflow_run_id,
+          t.blocked_reason,
+          t.due_at
+        from public.tasks t
+        left join public.agents a on a.id = t.owner_agent_id
+        where t.id = $1::uuid
+        limit 1
+      `,
+      [taskId],
+    );
+
+    return result.rows[0] ? mapTask(result.rows[0]) : null;
+  } catch (error) {
+    mapDbError(error);
+  }
+}

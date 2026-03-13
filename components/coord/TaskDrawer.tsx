@@ -14,10 +14,36 @@ type Props = {
 
 const WRITE_KEY_STORAGE = "dark-factory-admin-api-key";
 
+type TaskMailSummary = {
+  enabled: boolean;
+  project_url?: string;
+  thread_id?: string;
+  thread_url?: string;
+  recent_messages: Array<{
+    id: number;
+    subject?: string;
+    from?: string;
+    created_ts?: string;
+    importance?: string;
+  }>;
+  active_reservations: Array<{
+    id: number;
+    agent: string;
+    path_pattern: string;
+    reason?: string | null;
+    stale?: boolean;
+  }>;
+  reservation_conflicts: number;
+};
+
 export function TaskDrawer({ task, relatedTasks, onClose }: Props) {
   const [handoffs, setHandoffs] = useState<Handoff[]>([]);
   const [events, setEvents] = useState<TaskEvent[]>([]);
-  const [apiKey, setApiKey] = useState("");
+  const [mailSummary, setMailSummary] = useState<TaskMailSummary | null>(null);
+  const [apiKey, setApiKey] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(WRITE_KEY_STORAGE) ?? "";
+  });
   const [targetTaskId, setTargetTaskId] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,13 +56,6 @@ export function TaskDrawer({ task, relatedTasks, onClose }: Props) {
 
   useEffect(() => {
     if (!task) return;
-
-    const stored = window.localStorage.getItem(WRITE_KEY_STORAGE);
-    if (stored) setApiKey(stored);
-    setTargetTaskId("");
-    setNote("");
-    setError(null);
-    setSuccess(null);
 
     fetch(`/api/v1/tasks/${task.id}/handoffs`, { cache: "no-store" })
       .then(async (response) => {
@@ -53,6 +72,14 @@ export function TaskDrawer({ task, relatedTasks, onClose }: Props) {
       })
       .then((payload) => setEvents(Array.isArray(payload.items) ? payload.items : []))
       .catch(() => setEvents([]));
+
+    fetch(`/api/v1/tasks/${task.id}/mail-summary`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return (await response.json()) as TaskMailSummary;
+      })
+      .then((payload) => setMailSummary(payload))
+      .catch(() => setMailSummary(null));
   }, [task]);
 
   async function handleCreateHandoff(event: FormEvent<HTMLFormElement>) {
@@ -163,6 +190,88 @@ export function TaskDrawer({ task, relatedTasks, onClose }: Props) {
           <button type="button">Request Approval</button>
           <button type="button">Attach Artifact</button>
         </div>
+
+        <section className="drawer-section">
+          <div className="drawer-section-head">
+            <h4>Agent Mail</h4>
+            <p>{mailSummary?.enabled ? `Thread ${mailSummary.thread_id ?? "n/a"}` : "Agent Mail not available for this task"}</p>
+          </div>
+
+          {mailSummary?.enabled ? (
+            <div className="task-event-list">
+              <article className="task-event-card">
+                <div className="handoff-card-head">
+                  <strong>Links</strong>
+                </div>
+                <p className="mail-summary-line">
+                  {mailSummary.project_url ? (
+                    <a href={mailSummary.project_url} target="_blank" rel="noreferrer">
+                      Open project
+                    </a>
+                  ) : (
+                    <span>Project link unavailable</span>
+                  )}
+                  {mailSummary.thread_url ? (
+                    <>
+                      {" • "}
+                      <a href={mailSummary.thread_url} target="_blank" rel="noreferrer">
+                        Open thread
+                      </a>
+                    </>
+                  ) : null}
+                </p>
+              </article>
+
+              <article className="task-event-card">
+                <div className="handoff-card-head">
+                  <strong>Recent task messages</strong>
+                  <span>{mailSummary.recent_messages.length}</span>
+                </div>
+                {mailSummary.recent_messages.length ? (
+                  <div className="mail-summary-list">
+                    {mailSummary.recent_messages.map((message) => (
+                      <div key={message.id} className="mail-summary-item">
+                        <p>{message.subject ?? "Untitled message"}</p>
+                        <span>
+                          {message.from ?? "unknown"} • {message.importance ?? "normal"} •{" "}
+                          {message.created_ts ? new Date(message.created_ts).toLocaleString() : "n/a"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="type-body-md">No task-specific messages in the thread yet.</p>
+                )}
+              </article>
+
+              <article className="task-event-card">
+                <div className="handoff-card-head">
+                  <strong>Active reservations</strong>
+                  <span>{mailSummary.active_reservations.length}</span>
+                </div>
+                {mailSummary.active_reservations.length ? (
+                  <div className="mail-summary-list">
+                    {mailSummary.active_reservations.map((reservation) => (
+                      <div key={reservation.id} className="mail-summary-item">
+                        <p>{reservation.path_pattern}</p>
+                        <span>
+                          {reservation.agent}
+                          {reservation.reason ? ` • ${reservation.reason}` : ""}
+                          {reservation.stale ? " • stale" : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="type-body-md">No active reservations linked to this task.</p>
+                )}
+                {mailSummary.reservation_conflicts ? (
+                  <p className="create-run-error">Reservation conflicts: {mailSummary.reservation_conflicts}</p>
+                ) : null}
+              </article>
+            </div>
+          ) : null}
+        </section>
 
         <section className="drawer-section">
           <div className="drawer-section-head">

@@ -34,6 +34,14 @@ export type WorkflowTemplateSummary = {
   name: string;
   version: string;
   active: boolean;
+  tasks?: Array<{
+    key: string;
+    title: string;
+    task_type: string;
+    priority: "low" | "normal" | "high" | "urgent";
+    owner_agent_key?: string;
+    depends_on?: string[];
+  }>;
 };
 
 export type Task = {

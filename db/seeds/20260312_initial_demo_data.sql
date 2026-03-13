@@ -51,7 +51,16 @@ values
     'content_pipeline',
     'Content Pipeline',
     'v1',
-    '{"stages":["research","selection","brief","draft","approval"]}'::jsonb,
+    '{
+      "stages":["research","selection","brief","draft","approval"],
+      "tasks":[
+        {"key":"research","title":"Generate topic candidates","task_type":"memory.research","priority":"normal","owner_agent_key":"agent-memory"},
+        {"key":"brief","title":"Produce research brief","task_type":"knowledge.synthesis","priority":"high","owner_agent_key":"agent-knowledge","depends_on":["research"]},
+        {"key":"draft","title":"Draft post variants","task_type":"content.drafting","priority":"high","owner_agent_key":"agent-content","depends_on":["brief"]},
+        {"key":"approval","title":"Final human approval","task_type":"human.approval","priority":"urgent","depends_on":["draft"]},
+        {"key":"distribution","title":"Distribution prep","task_type":"distribution.publish","priority":"normal","owner_agent_key":"agent-distribution","depends_on":["approval"]}
+      ]
+    }'::jsonb,
     true
   ),
   (
@@ -59,7 +68,15 @@ values
     'newsletter_pipeline',
     'Newsletter Pipeline',
     'v1',
-    '{"stages":["brief","draft","approval","distribution"]}'::jsonb,
+    '{
+      "stages":["brief","draft","approval","distribution"],
+      "tasks":[
+        {"key":"brief","title":"Build newsletter brief","task_type":"knowledge.synthesis","priority":"high","owner_agent_key":"agent-knowledge"},
+        {"key":"draft","title":"Draft newsletter sections","task_type":"content.drafting","priority":"high","owner_agent_key":"agent-content","depends_on":["brief"]},
+        {"key":"approval","title":"Final human approval","task_type":"human.approval","priority":"urgent","depends_on":["draft"]},
+        {"key":"distribution","title":"Prepare distribution package","task_type":"distribution.publish","priority":"normal","owner_agent_key":"agent-distribution","depends_on":["approval"]}
+      ]
+    }'::jsonb,
     true
   )
 on conflict (template_key, version) do update

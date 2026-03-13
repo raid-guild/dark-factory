@@ -17,12 +17,22 @@ export async function POST(request: Request) {
     body.context_json && typeof body.context_json === "object" && !Array.isArray(body.context_json)
       ? (body.context_json as Record<string, unknown>)
       : {};
+  const status =
+    body.status === "pending" ||
+    body.status === "running" ||
+    body.status === "blocked" ||
+    body.status === "completed" ||
+    body.status === "failed" ||
+    body.status === "canceled"
+      ? body.status
+      : undefined;
 
   try {
     const result = await createWorkflowRun({
       workflowTemplateId,
       contextJson,
       requestedByAgentKey: auth.agentId,
+      status,
     });
 
     if (result.kind === "not_found") return fail("Workflow template not found", 404, { workflow_template_id: workflowTemplateId });

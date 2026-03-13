@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fira_Code, IM_Fell_English, Source_Sans_3 } from "next/font/google";
+import { validateEnvironment } from "@/lib/env";
 import "./globals.css";
 
 const imFell = IM_Fell_English({
@@ -31,6 +32,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  validateEnvironment();
+
   return (
     <html lang="en">
       <body className={`${imFell.variable} ${sourceSans.variable} ${firaCode.variable}`}>

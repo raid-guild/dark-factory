@@ -46,6 +46,12 @@ type WorkflowTemplateRecord = {
 
 type MaterializedTask = WorkflowTemplateDefinitionTask;
 
+type UpdateWorkflowRunInput = {
+  runId: string;
+  status?: WorkflowRunStatus;
+  contextJson?: Record<string, unknown>;
+};
+
 type WorkflowRunCreateResult =
   | {
       kind: "ok";
@@ -176,7 +182,7 @@ function parseTemplateTasks(definitionJson: Record<string, unknown> | null): Wor
   });
 }
 
-function getFallbackTemplateTasks(templateKey: string, version: string): MaterializedTask[] {
+export function getFallbackTemplateTasks(templateKey: string, version: string): MaterializedTask[] {
   const templateRef = `${templateKey}:${version}`;
 
   if (templateRef === "content_pipeline:v1") {
@@ -413,6 +419,61 @@ export async function createWorkflowRun(input: CreateWorkflowRunInput): Promise<
         tasks_created: materializedTasks.length,
       };
     });
+  } catch (error) {
+    mapDbError(error);
+  }
+}
+
+export async function updateWorkflowRun(input: UpdateWorkflowRunInput): Promise<WorkflowRun | null> {
+  try {
+    const updates: string[] = [];
+    const values: unknown[] = [input.runId];
+
+    if (input.status) {
+      values.push(input.status);
+      updates.push(`status = $${values.length}::workflow_run_status`);
+      if (input.status === "running") {
+        updates.push(`started_at = coalesce(started_at, now())`);
+      }
+      if (input.status === "completed") {
+        updates.push(`completed_at = coalesce(completed_at, now())`);
+      }
+      if (input.status !== "completed") {
+        updates.push(`completed_at = case when $${values.length}::workflow_run_status = 'completed' then completed_at else null end`);
+      }
+    }
+
+    if (input.contextJson) {
+      values.push(JSON.stringify(input.contextJson));
+      updates.push(`context_json = $${values.length}::jsonb`);
+    }
+
+    if (!updates.length) {
+      return getWorkflowRunById(input.runId);
+    }
+
+    const result = await query<WorkflowRunRow>(
+      `
+        update public.workflow_runs wr
+        set
+          ${updates.join(",\n          ")},
+          updated_at = now()
+        from public.workflow_templates wt
+        where wr.workflow_template_id = wt.id
+          and wr.id = $1::uuid
+        returning
+          wr.id,
+          coalesce(wt.template_key || ':' || wt.version, wt.template_key, wr.workflow_template_id::text) as workflow_template_id,
+          wr.status,
+          wr.requested_by_actor_id,
+          wr.started_at,
+          wr.completed_at,
+          wr.context_json
+      `,
+      values,
+    );
+
+    return result.rows[0] ? mapWorkflowRun(result.rows[0]) : null;
   } catch (error) {
     mapDbError(error);
   }
