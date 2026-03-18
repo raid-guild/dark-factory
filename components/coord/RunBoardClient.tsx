@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PresenceBar } from "@/components/coord/PresenceBar";
 import { StatusPill } from "@/components/coord/StatusPill";
 import { TaskCard } from "@/components/coord/TaskCard";
 import { TaskDrawer } from "@/components/coord/TaskDrawer";
 import { runStatusMeta, taskStatusMeta, taskStatusOrder } from "@/components/coord/status";
 import { mockPresence, mockRuns, mockTasks } from "@/lib/coord/mock";
-import type { AgentPresence, Task, TaskStatus, WorkflowRun } from "@/lib/coord/types";
+import type { AgentPresence, Artifact, Task, TaskStatus, WorkflowRun } from "@/lib/coord/types";
 
 type Props = {
   runId: string;
 };
+
+const BOARD_POLL_INTERVAL_MS = 10000;
 
 type WorkflowRunMailSummary = {
   enabled: boolean;
@@ -62,6 +64,17 @@ async function loadMailSummary(runId: string): Promise<WorkflowRunMailSummary | 
   }
 }
 
+async function loadRunArtifacts(runId: string): Promise<Artifact[] | null> {
+  try {
+    const response = await fetch(`/api/v1/workflow-runs/${runId}/artifacts`, { cache: "no-store" });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { items?: Artifact[] };
+    return Array.isArray(data.items) ? data.items : [];
+  } catch {
+    return null;
+  }
+}
+
 export function RunBoardClient({ runId }: Props) {
   const [run, setRun] = useState<WorkflowRun | null>(null);
   const [tasks, setTasks] = useState<Task[]>(mockTasks.filter((t) => t.workflow_run_id === runId));
@@ -75,6 +88,7 @@ export function RunBoardClient({ runId }: Props) {
   const [hideDone, setHideDone] = useState(false);
   const [activity, setActivity] = useState<string[]>([]);
   const [mailSummary, setMailSummary] = useState<WorkflowRunMailSummary | null>(null);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [runApiKey, setRunApiKey] = useState(() => {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem("dark-factory-admin-api-key") ?? "";
@@ -85,9 +99,15 @@ export function RunBoardClient({ runId }: Props) {
   const [runUpdateSuccess, setRunUpdateSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activityExpanded, setActivityExpanded] = useState(false);
+  const [runDraftDirty, setRunDraftDirty] = useState(false);
 
-  async function refreshBoardData() {
-    const [runResult, tasksResult, mailResult] = await Promise.all([loadRun(runId), loadTasks(runId), loadMailSummary(runId)]);
+  const refreshBoardData = useCallback(async () => {
+    const [runResult, tasksResult, mailResult, artifactsResult] = await Promise.all([
+      loadRun(runId),
+      loadTasks(runId),
+      loadMailSummary(runId),
+      loadRunArtifacts(runId),
+    ]);
     const fallbackRun = mockRuns.find((item) => item.id === runId) ?? null;
     const nextRun = runResult ?? fallbackRun;
     const nextTasks = tasksResult && tasksResult.length > 0 ? tasksResult : mockTasks.filter((t) => t.workflow_run_id === runId);
@@ -97,31 +117,56 @@ export function RunBoardClient({ runId }: Props) {
     setSource(runResult || tasksResult ? "api" : "mock");
     setPresence(mockPresence);
     setMailSummary(mailResult);
-    if (nextRun) {
+    setArtifacts(artifactsResult ?? []);
+    if (nextRun && !runDraftDirty) {
       setRunStatusDraft(nextRun.status);
       setRunContextText(JSON.stringify(nextRun.context_json ?? {}, null, 2));
     }
+    setSelectedTask((current) => (current ? nextTasks.find((item) => item.id === current.id) ?? null : current));
     return nextTasks;
-  }
+  }, [runDraftDirty, runId]);
 
   useEffect(() => {
-    Promise.all([loadRun(runId), loadTasks(runId), loadMailSummary(runId)]).then(([runResult, tasksResult, mailResult]) => {
-      const fallbackRun = mockRuns.find((item) => item.id === runId) ?? null;
-      const nextRun = runResult ?? fallbackRun;
-      const nextTasks = tasksResult && tasksResult.length > 0 ? tasksResult : mockTasks.filter((t) => t.workflow_run_id === runId);
+    let cancelled = false;
 
-      setRun(nextRun);
-      setTasks(nextTasks);
-      setSource(runResult || tasksResult ? "api" : "mock");
-      setPresence(mockPresence);
-      setMailSummary(mailResult);
-      if (nextRun) {
-        setRunStatusDraft(nextRun.status);
-        setRunContextText(JSON.stringify(nextRun.context_json ?? {}, null, 2));
-      }
-      setIsLoading(false);
-    });
+    Promise.all([loadRun(runId), loadTasks(runId), loadMailSummary(runId), loadRunArtifacts(runId)]).then(
+      ([runResult, tasksResult, mailResult, artifactsResult]) => {
+        if (cancelled) return;
+
+        const fallbackRun = mockRuns.find((item) => item.id === runId) ?? null;
+        const nextRun = runResult ?? fallbackRun;
+        const nextTasks = tasksResult && tasksResult.length > 0 ? tasksResult : mockTasks.filter((t) => t.workflow_run_id === runId);
+
+        setRun(nextRun);
+        setTasks(nextTasks);
+        setSource(runResult || tasksResult ? "api" : "mock");
+        setPresence(mockPresence);
+        setMailSummary(mailResult);
+        setArtifacts(artifactsResult ?? []);
+        setSelectedTask((current) => (current ? nextTasks.find((item) => item.id === current.id) ?? null : current));
+        if (nextRun) {
+          setRunStatusDraft(nextRun.status);
+          setRunContextText(JSON.stringify(nextRun.context_json ?? {}, null, 2));
+        }
+        setIsLoading(false);
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
   }, [runId]);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const interval = window.setInterval(() => {
+      if (document.hidden) return;
+      void refreshBoardData();
+    }, BOARD_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(interval);
+  }, [isLoading, refreshBoardData]);
 
   const owners = useMemo(() => {
     const set = new Set(tasks.map((task) => task.owner_agent_id).filter(Boolean));
@@ -207,6 +252,7 @@ export function RunBoardClient({ runId }: Props) {
     window.localStorage.setItem("dark-factory-admin-api-key", runApiKey.trim());
     setRun(payload);
     setRunContextText(JSON.stringify(payload.context_json ?? {}, null, 2));
+    setRunDraftDirty(false);
     setRunUpdateSuccess("Workflow run updated.");
   }
 
@@ -268,7 +314,13 @@ export function RunBoardClient({ runId }: Props) {
         <form className="create-run-form" onSubmit={handleRunUpdate}>
           <label className="create-run-field">
             <span>Run status</span>
-            <select value={runStatusDraft} onChange={(event) => setRunStatusDraft(event.target.value as WorkflowRun["status"])}>
+            <select
+              value={runStatusDraft}
+              onChange={(event) => {
+                setRunStatusDraft(event.target.value as WorkflowRun["status"]);
+                setRunDraftDirty(true);
+              }}
+            >
               {Object.keys(runStatusMeta).map((status) => (
                 <option key={status} value={status}>
                   {runStatusMeta[status as WorkflowRun["status"]].label}
@@ -290,7 +342,14 @@ export function RunBoardClient({ runId }: Props) {
 
           <label className="create-run-field create-run-field-wide">
             <span>Run context JSON</span>
-            <textarea rows={7} value={runContextText} onChange={(event) => setRunContextText(event.target.value)} />
+            <textarea
+              rows={7}
+              value={runContextText}
+              onChange={(event) => {
+                setRunContextText(event.target.value);
+                setRunDraftDirty(true);
+              }}
+            />
           </label>
 
           <div className="create-run-actions">
@@ -421,6 +480,28 @@ export function RunBoardClient({ runId }: Props) {
                   {mailSummary.latest_subject ? <p className="mail-summary-line">Latest: {mailSummary.latest_subject}</p> : null}
                 </div>
               ) : null}
+              <div className="mail-summary-panel">
+                <p className="mail-summary-title">Run Artifacts</p>
+                <p className="mail-summary-line">Captured outputs: {artifacts.length}</p>
+                {artifacts.length ? (
+                  <div className="mail-summary-list">
+                    {artifacts.slice(0, 6).map((artifact) => (
+                      <div className="mail-summary-item" key={artifact.id}>
+                        <p>{artifact.title}</p>
+                        <span>
+                          {artifact.kind} • {artifact.approved_status} •{" "}
+                          {artifact.created_at ? new Date(artifact.created_at).toLocaleString() : "n/a"}
+                        </span>
+                        <a href={artifact.uri} rel="noreferrer" target="_blank">
+                          {artifact.uri}
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="type-body-md">No run-level artifacts recorded yet.</p>
+                )}
+              </div>
               {activity.length ? (
                 <ul>
                   {activity.map((entry, index) => (

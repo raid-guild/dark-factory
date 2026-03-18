@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { StatusPill } from "@/components/coord/StatusPill";
 import { taskStatusMeta } from "@/components/coord/status";
-import type { Handoff, Task, TaskEvent, TaskRelationSummary } from "@/lib/coord/types";
+import type { Artifact, Handoff, Task, TaskEvent, TaskRelationSummary } from "@/lib/coord/types";
 
 type Props = {
   task: Task | null;
@@ -48,6 +48,7 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
   const [events, setEvents] = useState<TaskEvent[]>([]);
   const [mailSummary, setMailSummary] = useState<TaskMailSummary | null>(null);
   const [relations, setRelations] = useState<TaskRelations>({ depends_on: [], dependents: [] });
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem(WRITE_KEY_STORAGE) ?? "";
@@ -58,6 +59,10 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
   const [mutationPending, setMutationPending] = useState<string | null>(null);
   const [targetTaskId, setTargetTaskId] = useState("");
   const [note, setNote] = useState("");
+  const [artifactKind, setArtifactKind] = useState("note");
+  const [artifactTitle, setArtifactTitle] = useState("");
+  const [artifactUri, setArtifactUri] = useState("");
+  const [artifactMetadataText, setArtifactMetadataText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -106,6 +111,14 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
         }),
       )
       .catch(() => setRelations({ depends_on: [], dependents: [] }));
+
+    fetch(`/api/v1/tasks/${task.id}/artifacts`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return { items: [] as Artifact[] };
+        return (await response.json()) as { items?: Artifact[] };
+      })
+      .then((payload) => setArtifacts(Array.isArray(payload.items) ? payload.items : []))
+      .catch(() => setArtifacts([]));
   }, [task]);
 
   function parseFilePaths() {
@@ -118,12 +131,18 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
   async function refreshTaskPanels() {
     if (!task) return;
 
-    const [eventsResponse, handoffsResponse, mailResponse, relationsResponse] = await Promise.all([
+    const [artifactsResponse, eventsResponse, handoffsResponse, mailResponse, relationsResponse] = await Promise.all([
+      fetch(`/api/v1/tasks/${task.id}/artifacts`, { cache: "no-store" }),
       fetch(`/api/v1/tasks/${task.id}/events`, { cache: "no-store" }),
       fetch(`/api/v1/tasks/${task.id}/handoffs`, { cache: "no-store" }),
       fetch(`/api/v1/tasks/${task.id}/mail-summary`, { cache: "no-store" }),
       fetch(`/api/v1/tasks/${task.id}/relations`, { cache: "no-store" }),
     ]);
+
+    if (artifactsResponse.ok) {
+      const payload = (await artifactsResponse.json()) as { items?: Artifact[] };
+      setArtifacts(Array.isArray(payload.items) ? payload.items : []);
+    }
 
     if (eventsResponse.ok) {
       const payload = (await eventsResponse.json()) as { items?: TaskEvent[] };
@@ -171,6 +190,26 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
     if (action === "complete" && completionNote.trim()) {
       payload.completion_note = completionNote.trim();
     }
+    if (action === "complete" && artifactKind.trim() && artifactTitle.trim() && artifactUri.trim()) {
+      let metadataJson: Record<string, unknown> = {};
+      if (artifactMetadataText.trim()) {
+        try {
+          metadataJson = JSON.parse(artifactMetadataText) as Record<string, unknown>;
+        } catch {
+          setError("Artifact metadata must be valid JSON.");
+          return;
+        }
+      }
+
+      payload.artifacts = [
+        {
+          kind: artifactKind.trim(),
+          title: artifactTitle.trim(),
+          uri: artifactUri.trim(),
+          metadata_json: metadataJson,
+        },
+      ];
+    }
 
     setMutationPending(action);
     const response = await fetch(`/api/v1/tasks/${task.id}/${action}`, {
@@ -183,14 +222,18 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
     });
     setMutationPending(null);
 
-    const body = (await response.json()) as Task & { message?: string };
+    const body = (await response.json()) as Task & { message?: string; artifacts_created?: number };
     if (!response.ok) {
       setError(body.message ?? `Failed to ${action} task.`);
       return;
     }
 
     window.localStorage.setItem(WRITE_KEY_STORAGE, apiKey.trim());
-    setSuccess(`Task ${action === "complete" ? "completed" : action === "block" ? "blocked" : action === "start" ? "started" : "claimed"}.`);
+    setSuccess(
+      `Task ${
+        action === "complete" ? "completed" : action === "block" ? "blocked" : action === "start" ? "started" : "claimed"
+      }${action === "complete" && body.artifacts_created ? ` with ${body.artifacts_created} artifact${body.artifacts_created === 1 ? "" : "s"}` : ""}.`,
+    );
     await onTaskMutated(task.id);
     await refreshTaskPanels();
   }
@@ -246,6 +289,64 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
     setTargetTaskId("");
     setNote("");
     setSuccess("Handoff created.");
+  }
+
+  async function handleCreateArtifact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!task) return;
+
+    setError(null);
+    setSuccess(null);
+
+    if (!apiKey.trim()) {
+      setError("Enter a write API key.");
+      return;
+    }
+
+    if (!artifactKind.trim() || !artifactTitle.trim() || !artifactUri.trim()) {
+      setError("Artifact kind, title, and uri are required.");
+      return;
+    }
+
+    let metadataJson: Record<string, unknown> = {};
+    if (artifactMetadataText.trim()) {
+      try {
+        metadataJson = JSON.parse(artifactMetadataText) as Record<string, unknown>;
+      } catch {
+        setError("Artifact metadata must be valid JSON.");
+        return;
+      }
+    }
+
+    const response = await fetch("/api/v1/artifacts", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-df-api-key": apiKey.trim(),
+      },
+      body: JSON.stringify({
+        task_id: task.id,
+        workflow_run_id: task.workflow_run_id,
+        kind: artifactKind.trim(),
+        title: artifactTitle.trim(),
+        uri: artifactUri.trim(),
+        metadata_json: metadataJson,
+      }),
+    });
+
+    const payload = (await response.json()) as Artifact & { message?: string };
+    if (!response.ok) {
+      setError(payload.message ?? "Failed to create artifact.");
+      return;
+    }
+
+    window.localStorage.setItem(WRITE_KEY_STORAGE, apiKey.trim());
+    setArtifacts((current) => [payload, ...current]);
+    setArtifactKind("note");
+    setArtifactTitle("");
+    setArtifactUri("");
+    setArtifactMetadataText("");
+    setSuccess("Artifact captured.");
   }
 
   if (!task) return null;
@@ -453,6 +554,71 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
               )}
             </article>
           </div>
+        </section>
+
+        <section className="drawer-section">
+          <div className="drawer-section-head">
+            <h4>Artifacts</h4>
+            <p>Capture durable output references for this task.</p>
+          </div>
+
+          <div className="task-event-list">
+            <article className="task-event-card">
+              <div className="handoff-card-head">
+                <strong>Current artifacts</strong>
+                <span>{artifacts.length}</span>
+              </div>
+              {artifacts.length ? (
+                <div className="mail-summary-list">
+                  {artifacts.map((artifact) => (
+                    <div key={artifact.id} className="mail-summary-item">
+                      <p>{artifact.title}</p>
+                      <span>
+                        {artifact.kind} • {artifact.approved_status} •{" "}
+                        {new Date(artifact.created_at).toLocaleString()}
+                      </span>
+                      <a href={artifact.uri} target="_blank" rel="noreferrer">
+                        {artifact.uri}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="type-body-md">No artifacts recorded for this task yet.</p>
+              )}
+            </article>
+          </div>
+
+          <form className="handoff-form" onSubmit={(event) => void handleCreateArtifact(event)}>
+            <label className="create-run-field">
+              <span>Kind</span>
+              <input value={artifactKind} onChange={(event) => setArtifactKind(event.target.value)} placeholder="research_brief" />
+            </label>
+
+            <label className="create-run-field create-run-field-wide">
+              <span>Title</span>
+              <input value={artifactTitle} onChange={(event) => setArtifactTitle(event.target.value)} placeholder="Research brief" />
+            </label>
+
+            <label className="create-run-field create-run-field-wide">
+              <span>URI or path</span>
+              <input value={artifactUri} onChange={(event) => setArtifactUri(event.target.value)} placeholder="outputs/research-brief-run-123.md" />
+            </label>
+
+            <label className="create-run-field create-run-field-wide">
+              <span>Metadata JSON</span>
+              <textarea
+                rows={3}
+                value={artifactMetadataText}
+                onChange={(event) => setArtifactMetadataText(event.target.value)}
+                placeholder='{"format":"markdown","source":"agent-content"}'
+              />
+            </label>
+
+            <div className="drawer-actions">
+              <button type="submit">Add artifact</button>
+            </div>
+          </form>
         </section>
 
         <section className="drawer-section">

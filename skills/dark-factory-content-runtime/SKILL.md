@@ -1,6 +1,14 @@
 ---
 name: dark-factory-content-runtime
 description: Run inbox-driven content workflow tasks in Dark Factory. Use when an agent needs to check Agent Mail for work, sync task state with prism-coord, reserve files, report progress or blockers, and hand off context to the next content agent.
+metadata:
+  required_env_vars:
+    - DARK_FACTORY_URL
+    - DARK_FACTORY_API_KEY
+    - AGENT_ID
+    - AGENT_MAIL_URL
+    - AGENT_MAIL_BEARER_TOKEN
+    - AGENT_MAIL_PROJECT_KEY
 ---
 
 # Dark Factory Content Runtime
@@ -21,6 +29,56 @@ Before using this skill, confirm:
 
 If any of those are missing, stop and ask for the missing runtime details instead of guessing.
 
+## Auth And Bootstrap
+
+This skill assumes the runtime was provisioned with:
+- `DARK_FACTORY_URL`
+- `DARK_FACTORY_API_KEY`
+- `AGENT_ID`
+- `AGENT_MAIL_URL`
+- `AGENT_MAIL_BEARER_TOKEN`
+- `AGENT_MAIL_PROJECT_KEY`
+
+Example shared project key for this repo:
+- `/home/dekanjbrown/Projects/raidguild/dark-factory/prism-coord`
+
+Dark Factory writes use:
+- header: `x-df-api-key: <DARK_FACTORY_API_KEY>`
+
+The API key is already bound to the agent identity. Do not invent or swap identities at runtime.
+
+Expected first control-plane call:
+- `POST /api/v1/agents/register-self`
+
+Example:
+
+```bash
+curl -X POST "$DARK_FACTORY_URL/api/v1/agents/register-self" \
+  -H "content-type: application/json" \
+  -H "x-df-api-key: $DARK_FACTORY_API_KEY" \
+  -d '{
+    "name":"memory-manager",
+    "description":"Research agent",
+    "type":"memory",
+    "capabilities":["memory.research"]
+  }'
+```
+
+If `DARK_FACTORY_API_KEY` is missing, the agent cannot register, heartbeat, claim tasks, or update task state.
+
+If `AGENT_MAIL_PROJECT_KEY` is missing, the agent may create or read mail under the wrong project namespace. All agents participating in the same workflow must use the same explicit project key.
+
+## Bundled Scripts
+
+Prefer the bundled scripts in `scripts/` for repetitive control-plane and mail operations:
+- `scripts/register_self.sh`
+- `scripts/get_tasks.sh`
+- `scripts/task_transition.sh`
+- `scripts/create_handoff.sh`
+- `scripts/read_run_thread.sh`
+
+Use those scripts instead of rewriting curl commands unless the workflow requires a one-off variation.
+
 ## Hard Rules
 
 - Treat `prism-coord` as the source of truth for task state.
@@ -29,6 +87,9 @@ If any of those are missing, stop and ask for the missing runtime details instea
 - Do not change task state in Agent Mail alone.
 - Do not release someone else’s reservations unless the workflow explicitly requires it.
 - Keep subjects and reservation reasons consistent with the conventions below.
+- Do not rely on another agent's local workspace paths as the only handoff mechanism.
+- When work moves to another task, persist the handoff in `prism-coord` and also post the context in Agent Mail.
+- When completing a task, include output references in the completion note and in the thread message.
 
 ## Conventions
 
@@ -70,7 +131,10 @@ When blocked:
 When complete:
 - `POST /api/v1/tasks/:taskId/complete`
 - include artifacts, outputs, or summary context in the thread message
+- include output references in the completion note whenever possible
 - release any reservations tied to `task:<task_id>`
+
+For content workflows, a completion is not high quality unless the next actor can use it without guessing. Prefer a concise but structured completion note over a generic "done".
 
 ## Handoffs
 
@@ -78,6 +142,10 @@ Create handoffs when:
 - the next task depends on your output
 - another agent needs context that is not obvious from the current task state
 - a blocker requires a different specialization
+
+Handoffs are not optional when downstream work depends on your output. Do both:
+- `POST /api/v1/handoffs` or `scripts/create_handoff.sh`
+- post the same essential context in the shared workflow thread
 
 A useful handoff message includes:
 - `task_id`
@@ -88,6 +156,11 @@ A useful handoff message includes:
 - artifact or output references
 - relevant files or reservations
 - blockers or assumptions
+
+If agents use separate workspaces:
+- do not assume another agent can read your local files
+- summarize the important content directly in the handoff
+- include file paths only as secondary references
 
 Keep the handoff visible in the shared workflow thread so operators can follow the run.
 
@@ -105,6 +178,12 @@ Typical `prism-coord` calls:
 
 Use the bound API key and do not write under another agent’s identity.
 
+Bundled control-plane helpers:
+- `scripts/register_self.sh '<json payload>'`
+- `scripts/get_tasks.sh`
+- `scripts/task_transition.sh <claim|start|block|complete> <task_id> [json payload]`
+- `scripts/create_handoff.sh <from_task_id> <to_task_id> '<note>'`
+
 Typical identity pattern:
 - key bound to `agent_id`
 - `POST /api/v1/agents/register-self` once the runtime is provisioned
@@ -118,6 +197,35 @@ Typical Agent Mail operations:
 - send task-specific messages using `[task:<task_id>] ...`
 - reserve files with reason `task:<task_id>`
 - release reservations when the task is done or reassigned
+
+Use the provisioned `AGENT_MAIL_PROJECT_KEY` exactly as given. Do not replace it with the agent's local workspace path unless an operator explicitly told you to do so.
+
+For this repo, the shared project key should normally stay:
+- `/home/dekanjbrown/Projects/raidguild/dark-factory/prism-coord`
+
+All cooperating agents in the same workflow must use the same project key.
+
+Bundled mail helper:
+- `scripts/read_run_thread.sh <workflow_run_id>`
+
+## Content Quality Expectations
+
+For `memory.research` or research-style tasks, the expected output should usually include:
+- objective and audience
+- key message angles
+- proof points or sources
+- outline or framing recommendation
+- guardrails or open risks
+- a clear next step for the drafting agent
+
+For `content.drafting` tasks, the expected output should usually include:
+- the requested format
+- a draft aligned to the run guidance
+- explicit use of the research handoff
+- any assumptions or missing inputs
+- a completion note that points to the draft output
+
+Thin outputs are worse than a brief but actionable structured handoff. Prefer specific, reusable context over short generic summaries.
 
 If Agent Mail agent names differ from `prism-coord` agent ids, rely on the configured stable mapping rather than inventing new names.
 

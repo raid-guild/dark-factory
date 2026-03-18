@@ -3,6 +3,13 @@ import type { Task, TaskStatus } from "@/lib/coord/types";
 import { DatabaseConfigError } from "@/lib/db/errors";
 import { withTransaction } from "@/lib/db/pool";
 
+type ArtifactInput = {
+  kind: string;
+  title: string;
+  uri: string;
+  metadata_json?: Record<string, unknown>;
+};
+
 type TaskMutationRow = {
   id: string;
   title: string;
@@ -111,6 +118,41 @@ async function writeTaskEvent(
   );
 }
 
+async function insertArtifacts(
+  client: PoolClient,
+  taskId: string,
+  workflowRunId: string | undefined,
+  actorId: string | null,
+  artifacts: ArtifactInput[],
+) {
+  for (const artifact of artifacts) {
+    await client.query(
+      `
+        insert into public.artifacts (
+          task_id,
+          workflow_run_id,
+          kind,
+          title,
+          uri,
+          metadata_json,
+          created_by_actor_id,
+          approved_status
+        )
+        values ($1::uuid, $2::uuid, $3, $4, $5, $6::jsonb, $7::uuid, 'unreviewed')
+      `,
+      [
+        taskId,
+        workflowRunId ?? null,
+        artifact.kind,
+        artifact.title,
+        artifact.uri,
+        JSON.stringify(artifact.metadata_json ?? {}),
+        actorId,
+      ],
+    );
+  }
+}
+
 async function transitionTask(
   client: PoolClient,
   taskId: string,
@@ -118,6 +160,7 @@ async function transitionTask(
   agentKey: string | null,
   blockedReason?: string | null,
   note?: string | null,
+  artifacts: ArtifactInput[] = [],
 ) {
   const current = await loadTaskForUpdate(client, taskId);
   if (!current) {
@@ -174,6 +217,10 @@ async function transitionTask(
     owner_agent_id: updated.owner_agent_id ?? null,
   });
 
+  if (nextStatus === "completed" && artifacts.length) {
+    await insertArtifacts(client, taskId, updated.workflow_run_id, actorId, artifacts);
+  }
+
   return { kind: "ok" as const, task: updated };
 }
 
@@ -201,9 +248,14 @@ export async function blockTask(taskId: string, agentKey: string | null, blocked
   }
 }
 
-export async function completeTask(taskId: string, agentKey: string | null, note: string | null = null) {
+export async function completeTask(
+  taskId: string,
+  agentKey: string | null,
+  note: string | null = null,
+  artifacts: ArtifactInput[] = [],
+) {
   try {
-    return await withTransaction((client) => transitionTask(client, taskId, "completed", agentKey, null, note));
+    return await withTransaction((client) => transitionTask(client, taskId, "completed", agentKey, null, note, artifacts));
   } catch (error) {
     mapDbError(error);
   }

@@ -20,6 +20,7 @@ function validateEnvironmentOnce() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const agentMailUrl = process.env.AGENT_MAIL_URL?.trim();
   const agentMailBearerToken = process.env.AGENT_MAIL_BEARER_TOKEN?.trim();
+  const agentMailProjectKey = process.env.AGENT_MAIL_PROJECT_KEY?.trim();
   const apiKeysJson = process.env.DARK_FACTORY_API_KEYS_JSON?.trim();
   const agentMapJson = process.env.AGENT_MAIL_AGENT_MAP_JSON?.trim();
 
@@ -45,6 +46,10 @@ function validateEnvironmentOnce() {
 
   if (agentMailUrl && !agentMailBearerToken) {
     warnings.push("AGENT_MAIL_URL is configured without AGENT_MAIL_BEARER_TOKEN. This is acceptable for local/dev setups but should be avoided in production.");
+  }
+
+  if (agentMailUrl && !agentMailProjectKey) {
+    warnings.push("AGENT_MAIL_URL is configured without AGENT_MAIL_PROJECT_KEY. Agents and prism-coord may drift into different mail project namespaces.");
   }
 
   if (!agentMailUrl && agentMailBearerToken) {

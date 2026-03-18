@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dark Factory Content Runtime"
+  short_description: "Operate as a Dark Factory content agent using prism-coord and Agent Mail"
+  default_prompt: "Use this skill as the default operating contract for Dark Factory work. Register yourself in prism-coord, use the shared Agent Mail project key, poll for assigned tasks, read the workflow thread, persist handoffs in prism-coord, keep task state in sync, and complete content work with structured outputs and explicit output references."

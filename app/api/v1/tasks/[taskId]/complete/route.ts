@@ -6,14 +6,38 @@ import { mirrorTaskTransitionToAgentMail, releaseTaskFilesInAgentMail } from "@/
 
 type Context = { params: Promise<{ taskId: string }> };
 
+function parseArtifacts(body: Record<string, unknown>) {
+  if (!Array.isArray(body.artifacts)) return [];
+
+  return body.artifacts
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+
+      const artifact = item as Record<string, unknown>;
+      const kind = typeof artifact.kind === "string" ? artifact.kind.trim() : "";
+      const title = typeof artifact.title === "string" ? artifact.title.trim() : "";
+      const uri = typeof artifact.uri === "string" ? artifact.uri.trim() : "";
+      const metadata_json =
+        artifact.metadata_json && typeof artifact.metadata_json === "object" && !Array.isArray(artifact.metadata_json)
+          ? (artifact.metadata_json as Record<string, unknown>)
+          : {};
+
+      if (!kind || !title || !uri) return null;
+
+      return { kind, title, uri, metadata_json };
+    })
+    .filter((item): item is { kind: string; title: string; uri: string; metadata_json: Record<string, unknown> } => Boolean(item));
+}
+
 export async function POST(request: Request, context: Context) {
   const { taskId } = await context.params;
   const body = await parseJson(request);
   const auth = getRequestAuthContext(request);
   const completionNote = typeof body.completion_note === "string" ? body.completion_note.trim() : "";
+  const artifacts = parseArtifacts(body);
 
   try {
-    const result = await completeTask(taskId, auth.agentId, completionNote || null);
+    const result = await completeTask(taskId, auth.agentId, completionNote || null, artifacts);
     if (result.kind === "not_found") return fail("Task not found", 404, { taskId });
     if (result.kind === "invalid_transition") {
       return fail("Invalid task transition", 409, {
@@ -44,7 +68,10 @@ export async function POST(request: Request, context: Context) {
       }).catch(() => undefined);
     }
 
-    return ok(result.task);
+    return ok({
+      ...result.task,
+      artifacts_created: artifacts.length,
+    });
   } catch (error) {
     if (isDatabaseConfigError(error)) return fail("Database is not configured", 503);
     return fail("Failed to complete task", 500, { taskId });

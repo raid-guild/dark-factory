@@ -96,3 +96,18 @@ export type TaskEvent = {
   payload: Record<string, unknown>;
   created_at: string;
 };
+
+export type ArtifactApprovalStatus = "unreviewed" | "approved" | "rejected";
+
+export type Artifact = {
+  id: string;
+  task_id?: string;
+  workflow_run_id?: string;
+  kind: string;
+  title: string;
+  uri: string;
+  metadata_json: Record<string, unknown>;
+  created_by_actor_id?: string;
+  approved_status: ArtifactApprovalStatus;
+  created_at: string;
+};

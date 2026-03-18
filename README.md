@@ -142,6 +142,40 @@ Recommended setup for a working agent:
 
 The skill does not replace runtime provisioning. It standardizes behavior once the agent has access.
 
+### Agent Bootstrap Contract
+
+Every working agent should be provisioned with:
+
+- `DARK_FACTORY_URL`
+- `DARK_FACTORY_API_KEY`
+- `AGENT_ID`
+- `AGENT_MAIL_URL`
+- `AGENT_MAIL_BEARER_TOKEN`
+
+Dark Factory auth uses:
+
+- header: `x-df-api-key: <DARK_FACTORY_API_KEY>`
+
+The first call an agent should make is usually:
+
+```bash
+curl -X POST "$DARK_FACTORY_URL/api/v1/agents/register-self" \
+  -H "content-type: application/json" \
+  -H "x-df-api-key: $DARK_FACTORY_API_KEY" \
+  -d '{
+    "name":"memory-manager",
+    "description":"Research agent",
+    "type":"memory",
+    "capabilities":["memory.research"]
+  }'
+```
+
+Important:
+
+- give each agent only its own bound key
+- do not give working agents the admin key
+- the full `DARK_FACTORY_API_KEYS_JSON` stays on the `prism-coord` service, not inside every agent runtime
+
 ## Agent Registry
 
 - `POST /api/v1/agents/register` is admin-only and should be treated as provisioning

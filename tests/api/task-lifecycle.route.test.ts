@@ -100,6 +100,14 @@ describe("task lifecycle routes", () => {
         body: JSON.stringify({
           completion_note: "Finished operator review",
           file_paths: ["content/draft.md"],
+          artifacts: [
+            {
+              kind: "draft",
+              title: "Final draft",
+              uri: "outputs/draft.md",
+              metadata_json: { format: "markdown" },
+            },
+          ],
         }),
       }),
       { params: Promise.resolve({ taskId: "task-1" }) },
@@ -107,7 +115,15 @@ describe("task lifecycle routes", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(taskMutationsMock.completeTask).toHaveBeenCalledWith("task-1", "agent-memory", "Finished operator review");
+    expect(taskMutationsMock.completeTask).toHaveBeenCalledWith("task-1", "agent-memory", "Finished operator review", [
+      {
+        kind: "draft",
+        title: "Final draft",
+        uri: "outputs/draft.md",
+        metadata_json: { format: "markdown" },
+      },
+    ]);
     expect(body.status).toBe("completed");
+    expect(body.artifacts_created).toBe(1);
   });
 });
