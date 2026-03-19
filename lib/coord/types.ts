@@ -120,6 +120,8 @@ export type Artifact = {
   title: string;
   uri: string;
   metadata_json: Record<string, unknown>;
+  body_markdown?: string;
+  body_text?: string;
   created_by_actor_id?: string;
   approved_status: ArtifactApprovalStatus;
   created_at: string;

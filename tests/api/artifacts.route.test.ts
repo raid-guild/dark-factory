@@ -26,6 +26,7 @@ describe("artifacts routes", () => {
       title: "Research brief",
       uri: "outputs/brief.md",
       metadata_json: { format: "markdown" },
+      body_markdown: "# Brief",
       approved_status: "unreviewed",
       created_at: "2026-03-18T00:00:00.000Z",
     });
@@ -42,6 +43,7 @@ describe("artifacts routes", () => {
           title: "Research brief",
           uri: "outputs/brief.md",
           metadata_json: { format: "markdown" },
+          body_markdown: "# Brief",
         }),
       }),
     );
@@ -55,6 +57,8 @@ describe("artifacts routes", () => {
       title: "Research brief",
       uri: "outputs/brief.md",
       metadataJson: { format: "markdown" },
+      bodyMarkdown: "# Brief",
+      bodyText: null,
       actorAgentKey: "agent-content",
     });
     expect(body.id).toBe("artifact-1");
@@ -70,6 +74,7 @@ describe("artifacts routes", () => {
         title: "Draft output",
         uri: "outputs/draft.md",
         metadata_json: {},
+        body_markdown: "Draft body",
         approved_status: "unreviewed",
         created_at: "2026-03-18T00:00:00.000Z",
       },

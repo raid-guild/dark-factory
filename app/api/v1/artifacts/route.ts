@@ -15,6 +15,8 @@ export async function POST(request: Request) {
     body.metadata_json && typeof body.metadata_json === "object" && !Array.isArray(body.metadata_json)
       ? (body.metadata_json as Record<string, unknown>)
       : {};
+  const bodyMarkdown = typeof body.body_markdown === "string" ? body.body_markdown : "";
+  const bodyText = typeof body.body_text === "string" ? body.body_text : "";
 
   if (!kind || !title || !uri) {
     return fail("kind, title, and uri are required", 400);
@@ -32,6 +34,8 @@ export async function POST(request: Request) {
       title,
       uri,
       metadataJson,
+      bodyMarkdown: bodyMarkdown || null,
+      bodyText: bodyText || null,
       actorAgentKey: auth.agentId,
     });
 

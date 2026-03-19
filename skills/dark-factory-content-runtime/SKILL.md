@@ -40,7 +40,7 @@ This skill assumes the runtime was provisioned with:
 - `AGENT_MAIL_PROJECT_KEY`
 
 Example shared project key for this repo:
-- `/home/dekanjbrown/Projects/raidguild/dark-factory/prism-coord`
+- `raidguild/dark-factory/prism-coord`
 
 Dark Factory writes use:
 - header: `x-df-api-key: <DARK_FACTORY_API_KEY>`
@@ -67,6 +67,7 @@ curl -X POST "$DARK_FACTORY_URL/api/v1/agents/register-self" \
 If `DARK_FACTORY_API_KEY` is missing, the agent cannot register, heartbeat, claim tasks, or update task state.
 
 If `AGENT_MAIL_PROJECT_KEY` is missing, the agent may create or read mail under the wrong project namespace. All agents participating in the same workflow must use the same explicit project key.
+Use a stable shared logical key, not your own local filesystem path, unless an operator explicitly tells you otherwise.
 
 ## Bundled Scripts
 
@@ -74,6 +75,7 @@ Prefer the bundled scripts in `scripts/` for repetitive control-plane and mail o
 - `scripts/register_self.sh`
 - `scripts/get_tasks.sh`
 - `scripts/task_transition.sh`
+- `scripts/create_artifact.sh`
 - `scripts/create_handoff.sh`
 - `scripts/read_run_thread.sh`
 
@@ -90,6 +92,8 @@ Use those scripts instead of rewriting curl commands unless the workflow require
 - Do not rely on another agent's local workspace paths as the only handoff mechanism.
 - When work moves to another task, persist the handoff in `prism-coord` and also post the context in Agent Mail.
 - When completing a task, include output references in the completion note and in the thread message.
+- If a task produced a deliverable, create an artifact record before or during completion. A local file path in a note is not enough by itself.
+- For text deliverables, include the body in the artifact record whenever possible so operators can inspect it directly in prism-coord.
 
 ## Conventions
 
@@ -129,12 +133,15 @@ When blocked:
 - if another agent should take over, create a handoff with a precise next action
 
 When complete:
+- create an artifact record for any deliverable output using `POST /api/v1/artifacts` or `scripts/create_artifact.sh`
+- for markdown or text outputs, prefer `scripts/create_artifact.sh ... --body-markdown-file <path>` or `--body-text-file <path>`
 - `POST /api/v1/tasks/:taskId/complete`
 - include artifacts, outputs, or summary context in the thread message
 - include output references in the completion note whenever possible
 - release any reservations tied to `task:<task_id>`
 
 For content workflows, a completion is not high quality unless the next actor can use it without guessing. Prefer a concise but structured completion note over a generic "done".
+For deliverable tasks, a completion without an artifact record is incomplete unless an operator explicitly says otherwise.
 
 ## Handoffs
 
@@ -156,6 +163,8 @@ A useful handoff message includes:
 - artifact or output references
 - relevant files or reservations
 - blockers or assumptions
+
+When an artifact exists, reference it explicitly in the handoff note.
 
 If agents use separate workspaces:
 - do not assume another agent can read your local files
@@ -182,6 +191,7 @@ Bundled control-plane helpers:
 - `scripts/register_self.sh '<json payload>'`
 - `scripts/get_tasks.sh`
 - `scripts/task_transition.sh <claim|start|block|complete> <task_id> [json payload]`
+- `scripts/create_artifact.sh <task_id> <workflow_run_id> <kind> <title> <uri> [metadata json] [--body-markdown-file <path>] [--body-text-file <path>]`
 - `scripts/create_handoff.sh <from_task_id> <to_task_id> '<note>'`
 
 Typical identity pattern:
@@ -201,7 +211,7 @@ Typical Agent Mail operations:
 Use the provisioned `AGENT_MAIL_PROJECT_KEY` exactly as given. Do not replace it with the agent's local workspace path unless an operator explicitly told you to do so.
 
 For this repo, the shared project key should normally stay:
-- `/home/dekanjbrown/Projects/raidguild/dark-factory/prism-coord`
+- `raidguild/dark-factory/prism-coord`
 
 All cooperating agents in the same workflow must use the same project key.
 
@@ -217,6 +227,7 @@ For `memory.research` or research-style tasks, the expected output should usuall
 - outline or framing recommendation
 - guardrails or open risks
 - a clear next step for the drafting agent
+- an artifact record for the brief output
 
 For `content.drafting` tasks, the expected output should usually include:
 - the requested format
@@ -224,6 +235,7 @@ For `content.drafting` tasks, the expected output should usually include:
 - explicit use of the research handoff
 - any assumptions or missing inputs
 - a completion note that points to the draft output
+- an artifact record for the draft output
 
 Thin outputs are worse than a brief but actionable structured handoff. Prefer specific, reusable context over short generic summaries.
 

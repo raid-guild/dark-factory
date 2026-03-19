@@ -9,24 +9,42 @@ type Context = { params: Promise<{ taskId: string }> };
 function parseArtifacts(body: Record<string, unknown>) {
   if (!Array.isArray(body.artifacts)) return [];
 
-  return body.artifacts
-    .map((item) => {
-      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+  const parsed: Array<{
+    kind: string;
+    title: string;
+    uri: string;
+    metadata_json: Record<string, unknown>;
+    body_markdown?: string;
+    body_text?: string;
+  }> = [];
 
-      const artifact = item as Record<string, unknown>;
-      const kind = typeof artifact.kind === "string" ? artifact.kind.trim() : "";
-      const title = typeof artifact.title === "string" ? artifact.title.trim() : "";
-      const uri = typeof artifact.uri === "string" ? artifact.uri.trim() : "";
-      const metadata_json =
-        artifact.metadata_json && typeof artifact.metadata_json === "object" && !Array.isArray(artifact.metadata_json)
-          ? (artifact.metadata_json as Record<string, unknown>)
-          : {};
+  for (const item of body.artifacts) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
 
-      if (!kind || !title || !uri) return null;
+    const artifact = item as Record<string, unknown>;
+    const kind = typeof artifact.kind === "string" ? artifact.kind.trim() : "";
+    const title = typeof artifact.title === "string" ? artifact.title.trim() : "";
+    const uri = typeof artifact.uri === "string" ? artifact.uri.trim() : "";
+    const metadata_json =
+      artifact.metadata_json && typeof artifact.metadata_json === "object" && !Array.isArray(artifact.metadata_json)
+        ? (artifact.metadata_json as Record<string, unknown>)
+        : {};
+    const body_markdown = typeof artifact.body_markdown === "string" ? artifact.body_markdown : "";
+    const body_text = typeof artifact.body_text === "string" ? artifact.body_text : "";
 
-      return { kind, title, uri, metadata_json };
-    })
-    .filter((item): item is { kind: string; title: string; uri: string; metadata_json: Record<string, unknown> } => Boolean(item));
+    if (!kind || !title || !uri) continue;
+
+    parsed.push({
+      kind,
+      title,
+      uri,
+      metadata_json,
+      body_markdown: body_markdown || undefined,
+      body_text: body_text || undefined,
+    });
+  }
+
+  return parsed;
 }
 
 export async function POST(request: Request, context: Context) {

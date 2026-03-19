@@ -10,6 +10,8 @@ type ArtifactRow = {
   title: string;
   uri: string;
   metadata_json: Record<string, unknown> | null;
+  body_markdown: string | null;
+  body_text: string | null;
   created_by_actor_id: string | null;
   approved_status: ArtifactApprovalStatus;
   created_at: Date;
@@ -22,6 +24,8 @@ type CreateArtifactInput = {
   title: string;
   uri: string;
   metadataJson?: Record<string, unknown>;
+  bodyMarkdown?: string | null;
+  bodyText?: string | null;
   actorAgentKey?: string | null;
 };
 
@@ -42,6 +46,8 @@ function mapArtifact(row: ArtifactRow): Artifact {
     title: row.title,
     uri: row.uri,
     metadata_json: row.metadata_json ?? {},
+    body_markdown: row.body_markdown ?? undefined,
+    body_text: row.body_text ?? undefined,
     created_by_actor_id: row.created_by_actor_id ?? undefined,
     approved_status: row.approved_status,
     created_at: row.created_at.toISOString(),
@@ -79,10 +85,12 @@ export async function createArtifact(input: CreateArtifactInput): Promise<Artifa
             title,
             uri,
             metadata_json,
+            body_markdown,
+            body_text,
             created_by_actor_id,
             approved_status
           )
-          values ($1::uuid, $2::uuid, $3, $4, $5, $6::jsonb, $7::uuid, 'unreviewed')
+          values ($1::uuid, $2::uuid, $3, $4, $5, $6::jsonb, $7, $8, $9::uuid, 'unreviewed')
           returning
             id,
             task_id::text,
@@ -91,6 +99,8 @@ export async function createArtifact(input: CreateArtifactInput): Promise<Artifa
             title,
             uri,
             metadata_json,
+            body_markdown,
+            body_text,
             created_by_actor_id::text,
             approved_status,
             created_at
@@ -102,6 +112,8 @@ export async function createArtifact(input: CreateArtifactInput): Promise<Artifa
           input.title,
           input.uri,
           JSON.stringify(input.metadataJson ?? {}),
+          input.bodyMarkdown ?? null,
+          input.bodyText ?? null,
           actorId,
         ],
       );
@@ -125,6 +137,8 @@ export async function listTaskArtifacts(taskId: string): Promise<Artifact[]> {
           title,
           uri,
           metadata_json,
+          body_markdown,
+          body_text,
           created_by_actor_id::text,
           approved_status,
           created_at
@@ -153,6 +167,8 @@ export async function listWorkflowRunArtifacts(runId: string): Promise<Artifact[
           title,
           uri,
           metadata_json,
+          body_markdown,
+          body_text,
           created_by_actor_id::text,
           approved_status,
           created_at

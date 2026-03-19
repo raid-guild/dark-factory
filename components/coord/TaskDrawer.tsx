@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { isBrowserOpenableArtifactUri } from "@/components/coord/artifact-utils";
 import { StatusPill } from "@/components/coord/StatusPill";
 import { taskStatusMeta } from "@/components/coord/status";
 import type { Artifact, Handoff, Task, TaskDetail, TaskEvent, TaskRelationSummary } from "@/lib/coord/types";
@@ -64,6 +65,7 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
   const [artifactTitle, setArtifactTitle] = useState("");
   const [artifactUri, setArtifactUri] = useState("");
   const [artifactMetadataText, setArtifactMetadataText] = useState("");
+  const [artifactBodyMarkdownText, setArtifactBodyMarkdownText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -221,6 +223,7 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
           title: artifactTitle.trim(),
           uri: artifactUri.trim(),
           metadata_json: metadataJson,
+          body_markdown: artifactBodyMarkdownText.trim() || undefined,
         },
       ];
     }
@@ -345,6 +348,7 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
         title: artifactTitle.trim(),
         uri: artifactUri.trim(),
         metadata_json: metadataJson,
+        body_markdown: artifactBodyMarkdownText.trim() || undefined,
       }),
     });
 
@@ -360,6 +364,7 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
     setArtifactTitle("");
     setArtifactUri("");
     setArtifactMetadataText("");
+    setArtifactBodyMarkdownText("");
     setSuccess("Artifact captured.");
   }
 
@@ -635,9 +640,22 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
                         {artifact.kind} • {artifact.approved_status} •{" "}
                         {new Date(artifact.created_at).toLocaleString()}
                       </span>
-                      <a href={artifact.uri} target="_blank" rel="noreferrer">
-                        {artifact.uri}
-                      </a>
+                      {isBrowserOpenableArtifactUri(artifact.uri) ? (
+                        <a href={artifact.uri} target="_blank" rel="noreferrer">
+                          {artifact.uri}
+                        </a>
+                      ) : (
+                        <div className="artifact-path-block">
+                          <code>{artifact.uri}</code>
+                          <span>Workspace path; not directly browser-openable.</span>
+                        </div>
+                      )}
+                      {artifact.body_markdown || artifact.body_text ? (
+                        <details className="artifact-preview">
+                          <summary>Preview</summary>
+                          <pre>{artifact.body_markdown ?? artifact.body_text}</pre>
+                        </details>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -670,6 +688,16 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
                 value={artifactMetadataText}
                 onChange={(event) => setArtifactMetadataText(event.target.value)}
                 placeholder='{"format":"markdown","source":"agent-content"}'
+              />
+            </label>
+
+            <label className="create-run-field create-run-field-wide">
+              <span>Artifact body markdown</span>
+              <textarea
+                rows={6}
+                value={artifactBodyMarkdownText}
+                onChange={(event) => setArtifactBodyMarkdownText(event.target.value)}
+                placeholder={"# Draft\n\nPaste the artifact body when you want prism-coord to preview it."}
               />
             </label>
 

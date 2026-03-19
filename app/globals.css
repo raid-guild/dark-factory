@@ -1094,6 +1094,43 @@ code {
   font-size: 0.85rem;
 }
 
+.artifact-path-block {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.artifact-path-block code {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.artifact-path-block span {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.artifact-preview {
+  margin-top: 0.45rem;
+}
+
+.artifact-preview summary {
+  cursor: pointer;
+  color: var(--text-accent);
+  font-size: 0.85rem;
+}
+
+.artifact-preview pre {
+  margin-top: 0.5rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  font-size: 0.83rem;
+}
+
 .activity-panel {
   border: 1px solid var(--border);
   border-radius: 12px;

@@ -7,6 +7,7 @@ import { PresenceBar } from "@/components/coord/PresenceBar";
 import { StatusPill } from "@/components/coord/StatusPill";
 import { TaskCard } from "@/components/coord/TaskCard";
 import { TaskDrawer } from "@/components/coord/TaskDrawer";
+import { isBrowserOpenableArtifactUri } from "@/components/coord/artifact-utils";
 import { runStatusMeta, taskStatusMeta, taskStatusOrder } from "@/components/coord/status";
 import { mockPresence, mockRuns, mockTasks } from "@/lib/coord/mock";
 import type { AgentPresence, Artifact, Task, TaskStatus, WorkflowRun } from "@/lib/coord/types";
@@ -492,9 +493,22 @@ export function RunBoardClient({ runId }: Props) {
                           {artifact.kind} • {artifact.approved_status} •{" "}
                           {artifact.created_at ? new Date(artifact.created_at).toLocaleString() : "n/a"}
                         </span>
-                        <a href={artifact.uri} rel="noreferrer" target="_blank">
-                          {artifact.uri}
-                        </a>
+                        {isBrowserOpenableArtifactUri(artifact.uri) ? (
+                          <a href={artifact.uri} rel="noreferrer" target="_blank">
+                            {artifact.uri}
+                          </a>
+                        ) : (
+                          <div className="artifact-path-block">
+                            <code>{artifact.uri}</code>
+                            <span>Workspace path; not directly browser-openable.</span>
+                          </div>
+                        )}
+                        {artifact.body_markdown || artifact.body_text ? (
+                          <details className="artifact-preview">
+                            <summary>Preview</summary>
+                            <pre>{artifact.body_markdown ?? artifact.body_text}</pre>
+                          </details>
+                        ) : null}
                       </div>
                     ))}
                   </div>

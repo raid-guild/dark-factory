@@ -8,6 +8,8 @@ type ArtifactInput = {
   title: string;
   uri: string;
   metadata_json?: Record<string, unknown>;
+  body_markdown?: string;
+  body_text?: string;
 };
 
 type TaskMutationRow = {
@@ -135,10 +137,12 @@ async function insertArtifacts(
           title,
           uri,
           metadata_json,
+          body_markdown,
+          body_text,
           created_by_actor_id,
           approved_status
         )
-        values ($1::uuid, $2::uuid, $3, $4, $5, $6::jsonb, $7::uuid, 'unreviewed')
+        values ($1::uuid, $2::uuid, $3, $4, $5, $6::jsonb, $7, $8, $9::uuid, 'unreviewed')
       `,
       [
         taskId,
@@ -147,6 +151,8 @@ async function insertArtifacts(
         artifact.title,
         artifact.uri,
         JSON.stringify(artifact.metadata_json ?? {}),
+        artifact.body_markdown ?? null,
+        artifact.body_text ?? null,
         actorId,
       ],
     );
