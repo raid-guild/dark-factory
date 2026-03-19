@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { StatusPill } from "@/components/coord/StatusPill";
 import { taskStatusMeta } from "@/components/coord/status";
-import type { Artifact, Handoff, Task, TaskEvent, TaskRelationSummary } from "@/lib/coord/types";
+import type { Artifact, Handoff, Task, TaskDetail, TaskEvent, TaskRelationSummary } from "@/lib/coord/types";
 
 type Props = {
   task: Task | null;
@@ -49,6 +49,7 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
   const [mailSummary, setMailSummary] = useState<TaskMailSummary | null>(null);
   const [relations, setRelations] = useState<TaskRelations>({ depends_on: [], dependents: [] });
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem(WRITE_KEY_STORAGE) ?? "";
@@ -74,6 +75,14 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
 
   useEffect(() => {
     if (!task) return;
+
+    fetch(`/api/v1/tasks/${task.id}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return (await response.json()) as TaskDetail;
+      })
+      .then((payload) => setTaskDetail(payload))
+      .catch(() => setTaskDetail(null));
 
     fetch(`/api/v1/tasks/${task.id}/handoffs`, { cache: "no-store" })
       .then(async (response) => {
@@ -131,13 +140,18 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
   async function refreshTaskPanels() {
     if (!task) return;
 
-    const [artifactsResponse, eventsResponse, handoffsResponse, mailResponse, relationsResponse] = await Promise.all([
+    const [detailResponse, artifactsResponse, eventsResponse, handoffsResponse, mailResponse, relationsResponse] = await Promise.all([
+      fetch(`/api/v1/tasks/${task.id}`, { cache: "no-store" }),
       fetch(`/api/v1/tasks/${task.id}/artifacts`, { cache: "no-store" }),
       fetch(`/api/v1/tasks/${task.id}/events`, { cache: "no-store" }),
       fetch(`/api/v1/tasks/${task.id}/handoffs`, { cache: "no-store" }),
       fetch(`/api/v1/tasks/${task.id}/mail-summary`, { cache: "no-store" }),
       fetch(`/api/v1/tasks/${task.id}/relations`, { cache: "no-store" }),
     ]);
+
+    if (detailResponse.ok) {
+      setTaskDetail((await detailResponse.json()) as TaskDetail);
+    }
 
     if (artifactsResponse.ok) {
       const payload = (await artifactsResponse.json()) as { items?: Artifact[] };
@@ -392,6 +406,13 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
           </>
         ) : null}
 
+        {taskDetail?.contract?.instructions ? (
+          <>
+            <h4>Instructions</h4>
+            <p>{taskDetail.contract.instructions}</p>
+          </>
+        ) : null}
+
         {task.blocked_reason ? (
           <>
             <h4>Blocked Reason</h4>
@@ -486,6 +507,43 @@ export function TaskDrawer({ task, relatedTasks, runContext, onClose, onTaskMuta
                   : "Currently unassigned."}
             </p>
           </div>
+
+          {taskDetail?.contract?.artifact_kind ? (
+            <article className="task-event-card">
+              <div className="handoff-card-head">
+                <strong>Expected artifact</strong>
+              </div>
+              <p className="handoff-card-note">{taskDetail.contract.artifact_kind}</p>
+            </article>
+          ) : null}
+
+          {taskDetail?.contract?.output_requirements?.length ? (
+            <article className="task-event-card">
+              <div className="handoff-card-head">
+                <strong>Output requirements</strong>
+                <span>{taskDetail.contract.output_requirements.length}</span>
+              </div>
+              <ul className="activity-panel-list">
+                {taskDetail.contract.output_requirements.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
+
+          {taskDetail?.contract?.completion_criteria?.length ? (
+            <article className="task-event-card">
+              <div className="handoff-card-head">
+                <strong>Completion criteria</strong>
+                <span>{taskDetail.contract.completion_criteria.length}</span>
+              </div>
+              <ul className="activity-panel-list">
+                {taskDetail.contract.completion_criteria.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
 
           {runContext && Object.keys(runContext).length ? (
             <article className="task-event-card">

@@ -44,9 +44,19 @@ export function RunsPageClient() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [initialStatus, setInitialStatus] = useState<WorkflowRun["status"]>("pending");
   const [contextJsonText, setContextJsonText] = useState('{\n  "topic": "New workflow run"\n}');
+  const [templateJsonText, setTemplateJsonText] = useState("{\n}");
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const [templateSuccess, setTemplateSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  function syncTemplateEditor(templateId: string, templateList: WorkflowTemplateSummary[]) {
+    const nextTemplate = templateList.find((template) => template.id === templateId) ?? null;
+    if (!nextTemplate) return;
+
+    setTemplateJsonText(JSON.stringify(nextTemplate.definition_json ?? { tasks: nextTemplate.tasks ?? [] }, null, 2));
+  }
 
   useEffect(() => {
     loadRuns().then((result) => {
@@ -56,7 +66,11 @@ export function RunsPageClient() {
 
     loadTemplates().then((items) => {
       setTemplates(items);
-      setSelectedTemplateId((current) => current || items[0]?.id || "");
+      setSelectedTemplateId((current) => {
+        const nextId = current || items[0]?.id || "";
+        if (nextId) syncTemplateEditor(nextId, items);
+        return nextId;
+      });
     });
   }, []);
 
@@ -76,6 +90,12 @@ export function RunsPageClient() {
     const result = await loadRuns();
     setRuns(result.items);
     setSource(result.source);
+  }
+
+  async function refreshTemplates() {
+    const items = await loadTemplates();
+    setTemplates(items);
+    return items;
   }
 
   async function handleCreateRun(event: FormEvent<HTMLFormElement>) {
@@ -138,6 +158,58 @@ export function RunsPageClient() {
     });
   }
 
+  async function handleUpdateTemplate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTemplateError(null);
+    setTemplateSuccess(null);
+
+    if (!selectedTemplateId) {
+      setTemplateError("Select a workflow template.");
+      return;
+    }
+
+    if (!apiKey.trim()) {
+      setTemplateError("Enter an admin or human API key.");
+      return;
+    }
+
+    let definitionJson: Record<string, unknown>;
+    try {
+      const parsed = JSON.parse(templateJsonText);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        setTemplateError("Template definition must be a JSON object.");
+        return;
+      }
+      definitionJson = parsed as Record<string, unknown>;
+    } catch {
+      setTemplateError("Template definition must be valid JSON.");
+      return;
+    }
+
+    const response = await fetch(`/api/v1/workflow-templates/${selectedTemplateId}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-df-api-key": apiKey.trim(),
+      },
+      body: JSON.stringify({
+        definition_json: definitionJson,
+      }),
+    });
+
+    const payload = (await response.json()) as WorkflowTemplateSummary & { message?: string };
+    if (!response.ok) {
+      setTemplateError(payload.message ?? "Failed to update template.");
+      return;
+    }
+
+    window.localStorage.setItem(CREATE_RUN_KEY_STORAGE, apiKey.trim());
+    const items = await refreshTemplates();
+    const refreshed = items.find((template) => template.id === selectedTemplateId) ?? payload;
+    setTemplateJsonText(JSON.stringify(refreshed.definition_json ?? { tasks: refreshed.tasks ?? [] }, null, 2));
+    setTemplateSuccess(`Updated template ${refreshed.name}. New runs will use the edited definition.`);
+  }
+
   return (
     <main className="container-custom">
       <p className="type-label-sm">WORKFLOW RUNS</p>
@@ -157,7 +229,14 @@ export function RunsPageClient() {
         <form className="create-run-form" onSubmit={handleCreateRun}>
           <label className="create-run-field">
             <span>Template</span>
-            <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+            <select
+              value={selectedTemplateId}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                setSelectedTemplateId(nextId);
+                syncTemplateEditor(nextId, templates);
+              }}
+            >
               <option value="">Select a template</option>
               {templates.map((template) => (
                 <option key={template.id} value={template.id}>
@@ -225,6 +304,30 @@ export function RunsPageClient() {
           </div>
         </form>
       </section>
+
+      {selectedTemplate ? (
+        <section className="landing-panel create-run-panel">
+          <div className="run-card-head">
+            <div>
+              <p className="type-label-sm">TEMPLATE EDITOR</p>
+              <h2>Edit the selected template definition.</h2>
+            </div>
+          </div>
+
+          <form className="create-run-form" onSubmit={handleUpdateTemplate}>
+            <label className="create-run-field create-run-field-wide">
+              <span>Template definition JSON</span>
+              <textarea rows={16} value={templateJsonText} onChange={(event) => setTemplateJsonText(event.target.value)} />
+            </label>
+
+            <div className="create-run-actions">
+              <button type="submit">Save template</button>
+              {templateError ? <p className="create-run-error">{templateError}</p> : null}
+              {templateSuccess ? <p className="create-run-success">{templateSuccess}</p> : null}
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       <section className="runs-summary">
         {Object.entries(statusCounts).map(([status, count]) => (

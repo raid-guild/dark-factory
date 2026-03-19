@@ -58,6 +58,33 @@ function normalizeTemplateTasks(
   }));
 }
 
+function buildDefinitionJson(
+  definitionJson: Record<string, unknown> | null | undefined,
+  tasks: NonNullable<WorkflowTemplateSummary["tasks"]>,
+) {
+  return {
+    ...(definitionJson ?? {}),
+    tasks,
+  };
+}
+
+function mapWorkflowTemplateRow(row: WorkflowTemplateRow): WorkflowTemplateSummary {
+  const parsedTasks = parseTemplateTasks(row.definition_json) ?? [];
+  const normalizedTasks = parsedTasks.length
+    ? normalizeTemplateTasks(parsedTasks)
+    : normalizeTemplateTasks(getFallbackTemplateTasks(row.template_key, row.version));
+
+  return {
+    id: row.id,
+    template_key: row.template_key,
+    name: row.name,
+    version: row.version,
+    active: row.active,
+    definition_json: buildDefinitionJson(row.definition_json, normalizedTasks),
+    tasks: normalizedTasks,
+  };
+}
+
 function mapDbError(error: unknown): never {
   if (error instanceof Error && error.message.includes("DATABASE_URL")) {
     throw new DatabaseConfigError();
@@ -76,20 +103,66 @@ export async function listWorkflowTemplates(): Promise<WorkflowTemplateSummary[]
       `,
     );
 
-    return result.rows.map((row) => {
-      const parsedTasks = parseTemplateTasks(row.definition_json) ?? [];
+    return result.rows.map(mapWorkflowTemplateRow);
+  } catch (error) {
+    mapDbError(error);
+  }
+}
 
-      return {
-        id: row.id,
-        template_key: row.template_key,
-        name: row.name,
-        version: row.version,
-        active: row.active,
-        tasks: parsedTasks.length
-          ? normalizeTemplateTasks(parsedTasks)
-          : normalizeTemplateTasks(getFallbackTemplateTasks(row.template_key, row.version)),
-      };
-    });
+export async function updateWorkflowTemplate(input: {
+  templateId: string;
+  name?: string;
+  active?: boolean;
+  definitionJson?: Record<string, unknown>;
+}): Promise<WorkflowTemplateSummary | null> {
+  try {
+    const updates: string[] = [];
+    const values: unknown[] = [input.templateId];
+    let index = 2;
+
+    if (typeof input.name === "string") {
+      updates.push(`name = $${index++}`);
+      values.push(input.name);
+    }
+
+    if (typeof input.active === "boolean") {
+      updates.push(`active = $${index++}`);
+      values.push(input.active);
+    }
+
+    if (input.definitionJson) {
+      updates.push(`definition_json = $${index++}::jsonb`);
+      values.push(JSON.stringify(input.definitionJson));
+    }
+
+    if (!updates.length) {
+      const existing = await query<WorkflowTemplateRow>(
+        `
+          select id, template_key, name, version, active, definition_json
+          from public.workflow_templates
+          where id = $1::uuid
+          limit 1
+        `,
+        [input.templateId],
+      );
+
+      return existing.rows[0] ? mapWorkflowTemplateRow(existing.rows[0]) : null;
+    }
+
+    const result = await query<WorkflowTemplateRow>(
+      `
+        update public.workflow_templates
+        set ${updates.join(", ")}
+        where id = $1::uuid
+        returning id, template_key, name, version, active, definition_json
+      `,
+      values,
+    );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    return mapWorkflowTemplateRow(row);
   } catch (error) {
     mapDbError(error);
   }

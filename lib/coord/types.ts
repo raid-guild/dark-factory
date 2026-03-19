@@ -34,6 +34,7 @@ export type WorkflowTemplateSummary = {
   name: string;
   version: string;
   active: boolean;
+  definition_json?: Record<string, unknown>;
   tasks?: Array<{
     key: string;
     title: string;
@@ -55,6 +56,18 @@ export type Task = {
   workflow_run_id?: string;
   blocked_reason?: string;
   due_at?: string;
+};
+
+export type TaskContract = {
+  key?: string;
+  instructions?: string;
+  output_requirements?: string[];
+  completion_criteria?: string[];
+  artifact_kind?: string;
+};
+
+export type TaskDetail = Task & {
+  contract?: TaskContract;
 };
 
 export type TaskRelationSummary = {
