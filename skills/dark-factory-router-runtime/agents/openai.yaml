@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dark Factory Router Runtime"
+  short_description: "Inspect all tasks and dispatch them deterministically to worker lanes"
+  default_prompt: "Use this skill as the Dark Factory router contract. Inspect the task pool, map queued work to the correct worker lane by owner or task type, avoid duplicate dispatch, and treat workers as distinct logical agents even if they share one external runtime."

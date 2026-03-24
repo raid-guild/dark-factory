@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dark Factory Worker Runtime"
+  short_description: "Execute assigned Dark Factory tasks with artifacts, handoffs, and Agent Mail updates"
+  default_prompt: "Use this skill as your default Dark Factory worker contract. Self-register if needed, keep heartbeat current, poll your own assigned tasks, read and write the workflow thread, create artifacts for deliverables, persist handoffs in prism-coord, reserve and release files when needed, and complete or block tasks without waiting for extra prompting."

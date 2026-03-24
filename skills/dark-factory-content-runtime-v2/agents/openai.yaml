@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dark Factory Content Runtime v2"
+  short_description: "Autonomous Dark Factory workflow agent with explicit Agent Mail write helpers"
+  default_prompt: "Use this skill as your default Dark Factory operating contract. Self-register if needed, keep heartbeat current, poll your assigned tasks, read and write the workflow thread in Agent Mail, create artifacts for deliverables, persist handoffs in prism-coord, reserve and release files when needed, and complete or block tasks without waiting for extra prompting."
